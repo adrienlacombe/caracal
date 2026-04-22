@@ -28,18 +28,18 @@ fxhash = "0.2.1"
 # (loosely), so 0.1.7 satisfies them.
 starknet-types-core = { version = "=0.1.7", features = ["hash", "prime-bigint", "serde"] }
 
-cairo-lang-compiler = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-defs = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-plugins = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-starknet = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-starknet-classes = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-filesystem = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-parser = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-syntax = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-semantic = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-utils = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-sierra-generator = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
-cairo-lang-sierra = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.15.0" }
+cairo-lang-compiler = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-defs = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-plugins = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-starknet = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-starknet-classes = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-filesystem = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-parser = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-syntax = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-semantic = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-utils = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-sierra-generator = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
+cairo-lang-sierra = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.16.1" }
 
 
 [dev-dependencies]
