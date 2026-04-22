@@ -25,7 +25,7 @@ fn test_u8_operators() {
     assert_le(1_u8, 4_u8, '1 <= 4');
     assert(!(4_u8 < 4_u8), '!(4 < 4)');
     assert_le(5_u8, 5_u8, '5 <= 5');
-    assert(!(5_u8 <= 4_u8), '!(5 <= 8)');
+    assert(!(5_u8 <= 4_u8), '!(5 <= 4)');
     assert_gt(5_u8, 2_u8, '5 > 2');
     assert_ge(5_u8, 2_u8, '5 >= 2');
     assert(!(3_u8 > 3_u8), '!(3 > 3)');
@@ -1283,7 +1283,7 @@ fn test_i8_operators() {
     assert_le(1_i8, 4_i8, '1 <= 4');
     assert(!(4_i8 < 4_i8), '!(4 < 4)');
     assert_le(5_i8, 5_i8, '5 <= 5');
-    assert(!(5_i8 <= 4_i8), '!(5 <= 8)');
+    assert(!(5_i8 <= 4_i8), '!(5 <= 4)');
     assert_gt(5_i8, 2_i8, '5 > 2');
     assert_ge(5_i8, 2_i8, '5 >= 2');
     assert(!(3_i8 > 3_i8), '!(3 > 3)');
@@ -1400,7 +1400,7 @@ fn test_i16_operators() {
     assert_le(1_i16, 4_i16, '1 <= 4');
     assert(!(4_i16 < 4_i16), '!(4 < 4)');
     assert_le(5_i16, 5_i16, '5 <= 5');
-    assert(!(5_i16 <= 4_i16), '!(5 <= 8)');
+    assert(!(5_i16 <= 4_i16), '!(5 <= 4)');
     assert_gt(5_i16, 2_i16, '5 > 2');
     assert_ge(5_i16, 2_i16, '5 >= 2');
     assert(!(3_i16 > 3_i16), '!(3 > 3)');
@@ -1515,7 +1515,7 @@ fn test_i32_operators() {
     assert_le(1_i32, 4_i32, '1 <= 4');
     assert(!(4_i32 < 4_i32), '!(4 < 4)');
     assert_le(5_i32, 5_i32, '5 <= 5');
-    assert(!(5_i32 <= 4_i32), '!(5 <= 8)');
+    assert(!(5_i32 <= 4_i32), '!(5 <= 4)');
     assert_gt(5_i32, 2_i32, '5 > 2');
     assert_ge(5_i32, 2_i32, '5 >= 2');
     assert(!(3_i32 > 3_i32), '!(3 > 3)');
@@ -1638,7 +1638,7 @@ fn test_i64_operators() {
     assert_le(1_i64, 4_i64, '1 <= 4');
     assert(!(4_i64 < 4_i64), '!(4 < 4)');
     assert_le(5_i64, 5_i64, '5 <= 5');
-    assert(!(5_i64 <= 4_i64), '!(5 <= 8)');
+    assert(!(5_i64 <= 4_i64), '!(5 <= 4)');
     assert_gt(5_i64, 2_i64, '5 > 2');
     assert_ge(5_i64, 2_i64, '5 >= 2');
     assert(!(3_i64 > 3_i64), '!(3 > 3)');
@@ -1767,7 +1767,7 @@ fn test_i128_operators() {
     assert_le(1_i128, 4_i128, '1 <= 4');
     assert(!(4_i128 < 4_i128), '!(4 < 4)');
     assert_le(5_i128, 5_i128, '5 <= 5');
-    assert(!(5_i128 <= 4_i128), '!(5 <= 8)');
+    assert(!(5_i128 <= 4_i128), '!(5 <= 4)');
     assert_gt(5_i128, 2_i128, '5 > 2');
     assert_ge(5_i128, 2_i128, '5 >= 2');
     assert(!(3_i128 > 3_i128), '!(3 > 3)');
@@ -1869,6 +1869,70 @@ fn test_signed_int_diff() {
     assert_eq(@integer::i128_diff(3, 3).unwrap(), @0, 'i128: 3 - 3 == 0');
     assert_eq(@integer::i128_diff(4, 3).unwrap(), @1, 'i128: 4 - 3 == 1');
     assert_eq(@integer::i128_diff(3, 5).unwrap_err(), @~(2 - 1), 'i128: 3 - 5 == -2');
+}
+
+#[inline(never)]
+fn noopt<T>(t: T) -> T {
+    t
+}
+
+#[test]
+fn test_signed_int_neg() {
+    assert_eq!(-noopt(1), -1_i8);
+    assert_eq!(-noopt(0), 0_i8);
+    assert_eq!(-noopt(-1), 1_i8);
+    assert_eq!(-noopt(Bounded::<i8>::MAX), Bounded::<i8>::MIN + 1);
+    assert_eq!(-noopt(Bounded::<i8>::MIN + 1), Bounded::<i8>::MAX);
+    assert_eq!(-noopt(1), -1_i16);
+    assert_eq!(-noopt(0), 0_i16);
+    assert_eq!(-noopt(-1), 1_i16);
+    assert_eq!(-noopt(Bounded::<i16>::MAX), Bounded::<i16>::MIN + 1);
+    assert_eq!(-noopt(Bounded::<i16>::MIN + 1), Bounded::<i16>::MAX);
+    assert_eq!(-noopt(1), -1_i32);
+    assert_eq!(-noopt(0), 0_i32);
+    assert_eq!(-noopt(-1), 1_i32);
+    assert_eq!(-noopt(Bounded::<i32>::MAX), Bounded::<i32>::MIN + 1);
+    assert_eq!(-noopt(Bounded::<i32>::MIN + 1), Bounded::<i32>::MAX);
+    assert_eq!(-noopt(1), -1_i64);
+    assert_eq!(-noopt(0), 0_i64);
+    assert_eq!(-noopt(-1), 1_i64);
+    assert_eq!(-noopt(Bounded::<i64>::MAX), Bounded::<i64>::MIN + 1);
+    assert_eq!(-noopt(Bounded::<i64>::MIN + 1), Bounded::<i64>::MAX);
+    assert_eq!(-noopt(1), -1_i128);
+    assert_eq!(-noopt(0), 0_i128);
+    assert_eq!(-noopt(-1), 1_i128);
+    assert_eq!(-noopt(Bounded::<i128>::MAX), Bounded::<i128>::MIN + 1);
+    assert_eq!(-noopt(Bounded::<i128>::MIN + 1), Bounded::<i128>::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'i8_neg Underflow')]
+fn test_signed_int_neg_i8_min() {
+    -noopt(Bounded::<i8>::MIN);
+}
+
+#[test]
+#[should_panic(expected: 'i16_neg Underflow')]
+fn test_signed_int_neg_i16_min() {
+    -noopt(Bounded::<i16>::MIN);
+}
+
+#[test]
+#[should_panic(expected: 'i32_neg Underflow')]
+fn test_signed_int_neg_i32_min() {
+    -noopt(Bounded::<i32>::MIN);
+}
+
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_signed_int_neg_i64_min() {
+    -noopt(Bounded::<i64>::MIN);
+}
+
+#[test]
+#[should_panic(expected: 'i128_neg Underflow')]
+fn test_signed_int_neg_i128_min() {
+    -noopt(Bounded::<i128>::MIN);
 }
 
 #[feature("bounded-int-utils")]

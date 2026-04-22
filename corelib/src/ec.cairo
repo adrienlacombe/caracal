@@ -102,6 +102,9 @@ pub extern fn ec_point_unwrap(p: NonZeroEcPoint) -> (felt252, felt252) nopanic;
 /// Computes the negation of an elliptic curve point (-p).
 extern fn ec_neg(p: EcPoint) -> EcPoint nopanic;
 
+/// Computes the negation of a non-zero elliptic curve point (-p).
+extern fn ec_neg_nz(p: NonZeroEcPoint) -> NonZeroEcPoint nopanic;
+
 /// Checks whether the given `EcPoint` is the zero point.
 extern fn ec_point_is_zero(p: EcPoint) -> IsZeroResult<EcPoint> nopanic;
 
@@ -183,7 +186,6 @@ pub impl EcStateImpl of EcStateTrait {
     /// * `p` - The non-zero point to subtract
     #[inline]
     fn sub(ref self: EcState, p: NonZeroEcPoint) {
-        // TODO(orizi): Have a `ec_neg` for NonZeroEcPoint as well, or a `ec_state_sub`.
         ec_state_add(ref self, -p);
     }
 
@@ -202,11 +204,7 @@ pub impl EcStateImpl of EcStateTrait {
     ///
     /// # Returns
     ///
-    /// * `Option<NonZeroEcPoint>` - The resulting point, or None if the result is the zero point
-    ///
-    /// # Panics
-    ///
-    /// Panics if the result is the point at infinity.
+    /// * `Option<NonZeroEcPoint>` - The resulting point, or None if the result is the zero point.
     #[inline]
     fn finalize_nz(self: EcState) -> Option<NonZeroEcPoint> nopanic {
         ec_state_try_finalize_nz(self)
@@ -266,10 +264,6 @@ pub impl EcPointImpl of EcPointTrait {
     ///
     /// Returns `None` if no point with the given x-coordinate exists on the curve.
     ///
-    /// # Panics
-    ///
-    /// Panics if `x` is 0, as this would be the point at infinity.
-    ///
     /// # Examples
     ///
     /// ```
@@ -295,10 +289,6 @@ pub impl EcPointImpl of EcPointTrait {
     /// # Returns
     ///
     /// A tuple containing the (x, y) coordinates of the point.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the point is the point at infinity.
     ///
     /// # Examples
     ///
@@ -372,6 +362,23 @@ pub impl EcPointImpl of EcPointTrait {
 impl EcPointNeg of Neg<EcPoint> {
     fn neg(a: EcPoint) -> EcPoint {
         ec_neg(a)
+    }
+}
+
+#[cfg(sierra: "future")]
+impl NonZeroEcPointNeg of Neg<NonZeroEcPoint> {
+    fn neg(a: NonZeroEcPoint) -> NonZeroEcPoint {
+        ec_neg_nz(a)
+    }
+}
+
+// TODO(orizi): Remove this impl on next Sierra release.
+#[cfg(not(sierra: "future"))]
+impl NonZeroEcPointNeg of Neg<NonZeroEcPoint> {
+    fn neg(a: NonZeroEcPoint) -> NonZeroEcPoint {
+        // TODO(orizi): Have a `ec_neg` for NonZeroEcPoint as well.
+        let p: EcPoint = a.into();
+        (-p).try_into().unwrap()
     }
 }
 

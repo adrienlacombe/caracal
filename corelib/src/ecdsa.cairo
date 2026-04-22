@@ -26,7 +26,7 @@ use crate::zeroable::IsZeroResult;
 ///
 /// Note: the verification algorithm implemented by this function slightly deviates from the
 /// standard ECDSA.
-/// While this does not allow to create valid signatures if one does not possess the private key,
+/// While this does not allow creating valid signatures if one does not possess the private key,
 /// it means that the signature algorithm used should be modified accordingly.
 /// This function validates that `s` and `r` are not 0 or equal to the curve order,
 /// but does not check that `r, s < stark_curve::ORDER`, which should be checked by the caller.
@@ -55,10 +55,7 @@ use crate::zeroable::IsZeroResult;
 pub fn check_ecdsa_signature(
     message_hash: felt252, public_key: felt252, signature_r: felt252, signature_s: felt252,
 ) -> bool {
-    // Check that s != 0 (mod stark_curve::ORDER).
-    if signature_s == 0
-        || signature_s == ec::stark_curve::ORDER
-        || signature_r == ec::stark_curve::ORDER {
+    if is_equivalent_to_zero(signature_s) || signature_r == ec::stark_curve::ORDER {
         return false;
     }
 
@@ -74,9 +71,7 @@ pub fn check_ecdsa_signature(
     };
 
     // Retrieve the generator point.
-    let Some(gen_point) = EcPointTrait::new_nz(
-        ec::stark_curve::GEN_X, ec::stark_curve::GEN_Y,
-    ) else {
+    let Some(gen_point) = generator_point() else {
         return false;
     };
 
@@ -160,8 +155,12 @@ pub fn check_ecdsa_signature(
 pub fn recover_public_key(
     message_hash: felt252, signature_r: felt252, signature_s: felt252, y_parity: bool,
 ) -> Option<felt252> {
+    if is_equivalent_to_zero(signature_s) {
+        return None;
+    }
+
     let r_point = EcPointTrait::new_nz_from_x(signature_r)?;
-    let gen_point = EcPointTrait::new_nz(ec::stark_curve::GEN_X, ec::stark_curve::GEN_Y)?;
+    let gen_point = generator_point()?;
 
     // a Valid signature should satisfy:
     // zG + rQ = sR.
@@ -186,7 +185,7 @@ pub fn recover_public_key(
     let mut state = EcStateTrait::init();
     let ord = ORD;
     state.add_mul(ord - z_div_r, gen_point);
-    // Checking if the actual parity of the point's y is different than the requested, and if so,
+    // Checking if the actual parity of the point's y is different from the requested, and if so,
     // flipping the multiplier instead of negating the point to match the requested parity.
     let y: u256 = r_point.y().into();
     let r_multiplier = if (y.low & 1 != 0) ^ y_parity {
@@ -196,4 +195,56 @@ pub fn recover_public_key(
     };
     state.add_mul(r_multiplier, r_point);
     Some(state.finalize_nz()?.x())
+}
+
+/// Checks if `value != 0` (mod stark_curve::ORDER).
+fn is_equivalent_to_zero(value: felt252) -> bool {
+    // Note that `2 * ec::stark_curve::ORDER` is larger than the felt252 PRIME.
+    value == 0 || value == ec::stark_curve::ORDER
+}
+
+// TODO(orizi): Remove this function on next Sierra release.
+/// Returns the generator point of the elliptic curve.
+///
+/// Note: Cannot actually fail, as the generator point is always valid.
+#[cfg(not(sierra: "future"))]
+fn generator_point() -> Option<ec::NonZeroEcPoint> {
+    EcPointTrait::new_nz(ec::stark_curve::GEN_X, ec::stark_curve::GEN_Y)
+}
+
+// TODO(orizi): Remove this function and use `generator::value()` directly on next Sierra release.
+/// Returns the generator point of the elliptic curve.
+///
+/// Note: Cannot actually fail, as the generator point is always valid.
+#[cfg(sierra: "future")]
+fn generator_point() -> Option<ec::NonZeroEcPoint> {
+    Some(generator::value())
+}
+
+#[cfg(sierra: "future")]
+mod generator {
+    use crate::ec;
+
+    mod v {
+        /// Const type variant for the EcPoint type.
+        pub extern type Const<T, const X: felt252, const Y: felt252>;
+    }
+
+    mod nz {
+        /// Non-zero const type variant for the EcPoint type.
+        pub extern type Const<T, C>;
+    }
+
+    /// Extern declaration for fetching the actual value.
+    extern fn const_as_immediate<T>() -> NonZero<ec::EcPoint> nopanic;
+
+    /// Returns the generator point of the elliptic curve.
+    pub fn value() -> ec::NonZeroEcPoint {
+        const_as_immediate::<
+            nz::Const<
+                ec::NonZeroEcPoint,
+                v::Const<ec::EcPoint, ec::stark_curve::GEN_X, ec::stark_curve::GEN_Y>,
+            >,
+        >()
+    }
 }
