@@ -62,6 +62,7 @@ impl Detector for TxOrigin {
                                             if [
                                                 "core::starknet::info::TxInfo",
                                                 "core::starknet::info::v2::TxInfo",
+                                                "core::starknet::info::v3::TxInfo",
                                             ]
                                             .contains(&maybe_tx_info.as_str()) =>
                                         {

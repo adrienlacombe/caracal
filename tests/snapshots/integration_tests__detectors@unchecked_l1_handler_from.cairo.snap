@@ -23,10 +23,4 @@ input_file: tests/detectors/unchecked_l1_handler_from.cairo
         confidence: Medium,
         message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::check_recursive uses the felt252 operation felt252_add([3], [20]) -> ([21]), which is not overflow/underflow safe",
     },
-    Result {
-        impact: Low,
-        name: "use-after-pop-front",
-        confidence: Medium,
-        message: "The span [8] is used after removing elements from it in the function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__good3",
-    },
 ]

@@ -61,6 +61,22 @@ impl Detector for UseAfterPopFront {
                                 .get_libfunc(&invoc.libfunc_id)
                                 .expect("Library function not found in the registry");
 
+                            // Skip pops on the wrapper's calldata/serde buffer:
+                            // since cairo 2.6 the compiler inlines
+                            // `Serde::deserialize` — which pops felt252s — into
+                            // every entrypoint wrapper. Those are compiler
+                            // plumbing, not user intent.
+                            let is_felt252_pop = invoc
+                                .libfunc_id
+                                .debug_name
+                                .as_ref()
+                                .is_some_and(|n| {
+                                    n.ends_with("<felt252>") || n.contains("<core::felt252>")
+                                });
+                            if is_felt252_pop {
+                                return None;
+                            }
+
                             match libfunc {
                                 CoreConcreteLibfunc::Array(ArrayConcreteLibfunc::PopFront(_)) => {
                                     Some((
@@ -197,7 +213,9 @@ impl UseAfterPopFront {
     }
 
     // Analyse the statements of the function after the pop_front statement
-    // to see if any other element is added to the array.
+    // to see if the popped array is used again — either appended to, wrapped
+    // into a Span for serde/emit, passed to a user function (e.g. the
+    // compiler-generated serialize helper), or handed to a syscall.
     fn check_statements(
         &self,
         compilation_unit: &CompilationUnit,
@@ -207,9 +225,7 @@ impl UseAfterPopFront {
     ) -> bool {
         let taint = compilation_unit.get_taint(&function.name()).unwrap();
 
-        // Analyse the statements of the function after the pop_front statement
-        // to see if any other element is added to the array.
-        let bad_array_used = function
+        function
             .get_statements_at(stmt_index)
             .iter()
             .filter_map(|stmt| match stmt {
@@ -222,18 +238,51 @@ impl UseAfterPopFront {
                     .get_libfunc(&invoc.libfunc_id)
                     .expect("Library function not found in the registry");
 
-                match libfunc {
-                    CoreConcreteLibfunc::Array(ArrayConcreteLibfunc::Append(_)) => {
-                        let mut sinks = FxHashSet::default();
-                        sinks.insert(WrapperVariable::new(function.name(), invoc.args[0].id));
-
-                        taint.taints_any_sinks(bad_array, &sinks)
+                // Libfuncs that represent an actual "use" of the array. We
+                // deliberately exclude plumbing like store_temp/branch_align/
+                // redeposit_gas/drop and pure metadata reads like array_len.
+                let is_use = match libfunc {
+                    // Direct mutation.
+                    CoreConcreteLibfunc::Array(ArrayConcreteLibfunc::Append(_)) => true,
+                    // Forwarded to a user/core function (serialize_array_helper,
+                    // dispatcher impls, etc.). A loop body passes the array to
+                    // its own next iteration — that's not a leak, just the
+                    // normal consume pattern.
+                    CoreConcreteLibfunc::FunctionCall(call) => {
+                        call.function
+                            .id
+                            .debug_name
+                            .as_ref()
+                            .is_none_or(|n| *n != function.name())
+                    }
+                    // Handed directly to a syscall (call_contract, library_call,
+                    // emit_event, …).
+                    CoreConcreteLibfunc::Starknet(_) => true,
+                    // Wrapping the popped array into a Span (serde / event /
+                    // external call path). The libfunc id encodes the struct
+                    // generic, so match on its textual form. Inside a Loop
+                    // function, this is just the inner body repackaging the
+                    // remainder for the next iteration and is not a leak.
+                    CoreConcreteLibfunc::Struct(_) => {
+                        !matches!(function.ty(), Type::Loop)
+                            && invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
+                                n.starts_with("struct_construct<core::array::Span::")
+                            })
                     }
                     _ => false,
-                }
-            });
+                };
 
-        bad_array_used
+                if !is_use {
+                    return false;
+                }
+
+                let sinks: FxHashSet<WrapperVariable> = invoc
+                    .args
+                    .iter()
+                    .map(|a| WrapperVariable::new(function.name(), a.id))
+                    .collect();
+                taint.taints_any_sinks(bad_array, &sinks)
+            })
     }
 
     fn check_calls<'a>(
