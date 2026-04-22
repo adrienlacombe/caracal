@@ -9,13 +9,13 @@ input_file: tests/detectors/unchecked_l1_handler_from.cairo
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__bad uses the felt252 operation felt252_add([24], [25]) -> ([26]) with the user-controlled parameters: [24], which is not overflow/underflow safe",
+        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__bad uses the felt252 operation felt252_add([19], [20]) -> ([21]) with the user-controlled parameters: [19], which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__good3 uses the felt252 operation felt252_add([30], [31]) -> ([32]) with the user-controlled parameters: [30], which is not overflow/underflow safe",
+        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__good3 uses the felt252 operation felt252_add([25], [26]) -> ([27]) with the user-controlled parameters: [25], which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,

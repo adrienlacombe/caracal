@@ -3,14 +3,11 @@
 //!
 //!
 //! A variable of type `ClassHash` can be created from a `felt252` value using the
-//! `class_hash_const` function, or using the `TryInto` trait.
+//! `TryInto` trait.
 //!
 //! # Examples
 //!
 //! ```
-//! use starknet::class_hash::class_hash_const;
-//!
-//! let hash = class_hash_const::<0x123>();
 //! let hash = 0x123.try_into().unwrap();
 //! ```
 
@@ -31,9 +28,7 @@ impl ClassHashDrop of Drop<ClassHash>;
 /// # Examples
 ///
 /// ```
-/// use starknet::class_hash::class_hash_const;
-///
-/// let class_hash = class_hash_const::<0x123>();
+/// let class_hash = 0x123.try_into().unwrap();
 /// ```
 #[deprecated(
     feature: "deprecated-starknet-consts",
