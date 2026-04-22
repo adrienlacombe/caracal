@@ -12,6 +12,7 @@ use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
 use cairo_lang_compiler::CompilerConfig;
 use cairo_lang_filesystem::db::init_dev_corelib;
+use cairo_lang_filesystem::ids::CrateInput;
 use cairo_lang_sierra_generator::replace_ids::SierraIdReplacer;
 use cairo_lang_starknet::compile::compile_prepared_db;
 use cairo_lang_starknet::contract::find_contracts;
@@ -56,13 +57,14 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         .build()?;
     init_dev_corelib(&mut db, corelib);
 
-    let main_crate_ids = setup_project(&mut db, &opts.target)?;
+    let main_crate_inputs = setup_project(&mut db, &opts.target)?;
+    let main_crate_ids = CrateInput::into_crate_ids(&db, main_crate_inputs.clone());
 
     let compiler_config = CompilerConfig {
         replace_ids: true,
         diagnostics_reporter: DiagnosticsReporter::stderr()
             .allow_warnings()
-            .with_crates(&main_crate_ids),
+            .with_crates(&main_crate_inputs),
         ..Default::default()
     };
 

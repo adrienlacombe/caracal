@@ -282,7 +282,7 @@ macro my_array {
 
     [$first:expr, $($rest:expr),*] => {
         {
-            let mut arr = my_array![$($rest), *];
+            let mut arr = $defsite::my_array![$($rest), *];
             arr.append($first);
             arr
         }
@@ -397,7 +397,7 @@ macro tail_only {
 
 macro wrapped_tail_only {
     () => {
-        tail_only!()
+        $defsite::tail_only!()
     };
 }
 
@@ -481,7 +481,7 @@ mod unhygienic_expose_plugin_macro {
     macro outer {
         () => {
             expose!(let outer_var = 11;);
-            middle!();
+            $defsite::middle!();
         };
     }
 
@@ -491,7 +491,7 @@ mod unhygienic_expose_plugin_macro {
             assert_eq!($callsite::outer_var, 11);
             expose!(let outer_var = 1;);
             assert_eq!(outer_var, 1);
-            inner_most!();
+            $defsite::inner_most!();
         };
     }
 
@@ -520,7 +520,7 @@ mod unhygienic_expose_plugin_macro {
 
     macro wrap_expose_macro {
         () => {
-            expose!(set_var_macro!(123););
+            expose!($defsite::set_var_macro!(123););
         };
     }
 
@@ -553,5 +553,165 @@ mod unhygienic_expose_plugin_macro {
         let z = 1;
         expose_mappings_shift!(z);
         assert_eq!(y, 2);
+    }
+}
+
+mod item_level_macro {
+    macro define_fn {
+        ($name:ident) => {
+            expose! {
+                fn $name() -> felt252 { 100 }
+            }
+        };
+    }
+
+    define_fn!(func_macro_fn);
+
+    #[test]
+    fn test_func_macro_fn() {
+        assert_eq!(func_macro_fn(), 100);
+    }
+
+    macro define_ty_and_getter {
+        ($ty:ident) => {
+            expose! {
+                struct $ty { pub x: felt252 }
+                fn get_x(s: $ty) -> felt252 {
+                    s.x
+                }
+            }
+        };
+    }
+
+    define_ty_and_getter!(MyStruct);
+
+    #[test]
+    fn test_define_ty_and_getter() {
+        let s = MyStruct { x: 42 };
+        assert_eq!(get_x(s), 42);
+    }
+
+    macro define_enum {
+        ($name: ident) => {
+            expose! {
+                #[derive(PartialEq, Debug, Drop)]
+                enum $name {
+                    A,
+                    B,
+                }
+            }
+        };
+    }
+
+    define_enum!(MyEnum);
+
+    #[test]
+    fn test_enum_macro() {
+        let e = MyEnum::B;
+        assert_eq!(e, MyEnum::B);
+    }
+
+    macro generic_fn_macro {
+        () => {
+            expose! {
+                fn id<T>(x: T) -> T { x }
+            }
+        };
+    }
+
+    generic_fn_macro!();
+
+    #[test]
+    fn test_generic_fn_macro() {
+        assert_eq!(id(5), 5);
+        assert_eq!(id(123), 123);
+    }
+
+    macro define_in_mod {
+        ($module:ident, $name:ident) => {
+            expose! {
+                mod $module {
+                    pub fn $name() -> felt252 { 77 }
+                }
+            }
+        };
+    }
+
+    define_in_mod!(a, b);
+
+    #[test]
+    fn test_defined_in_mod_through_macro() {
+        assert_eq!(a::b(), 77);
+    }
+
+    macro define_outer_and_call_inner {
+        () => {
+            expose! {
+                fn outer() -> felt252 { 10 }
+                $defsite::define_inner!();
+            }
+        };
+    }
+
+    macro define_inner {
+        () => {
+            fn inner() -> felt252 { 20 }
+        };
+    }
+
+    define_outer_and_call_inner!();
+
+    #[test]
+    fn test_nested_macro_expansion() {
+        assert_eq!(outer(), 10);
+        assert_eq!(inner(), 20);
+    }
+
+    mod macro_vs_global_use {
+        mod has_foo {
+            pub fn foo() -> felt252 {
+                'in module'
+            }
+        }
+
+        macro define_foo {
+            () => {
+                expose! {
+                    fn foo() -> felt252 {
+                        'in macro'
+                    }
+                }
+            };
+        }
+        use has_foo::*;
+        define_foo!();
+
+        #[test]
+        fn test_macro_wins_over_global_use() {
+            assert_eq!(foo(), 'in macro');
+        }
+    }
+
+    mod unexposed_macro_vs_global_use {
+        mod has_foo {
+            pub fn foo() -> felt252 {
+                'in module'
+            }
+        }
+
+        macro define_foo {
+            () => {
+                fn foo() -> felt252 {
+                    'in macro'
+                }
+            };
+        }
+        use has_foo::*;
+        define_foo!();
+
+        #[test]
+        fn test_unexposed_macro_not_found() {
+            assert_eq!(foo(), 'in module');
+        }
     }
 }

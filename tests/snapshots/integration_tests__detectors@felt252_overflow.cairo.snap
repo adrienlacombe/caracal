@@ -9,13 +9,13 @@ input_file: tests/detectors/felt252_overflow.cairo
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function felt252_overflow::felt252_overflow::Felt252Overflow::__wrapper__bad_add_controlled uses the felt252 operation felt252_add([35], [40]) -> ([49]) with the user-controlled parameters: [40], which is not overflow/underflow safe",
+        message: "The function felt252_overflow::felt252_overflow::Felt252Overflow::__wrapper__bad_add_controlled uses the felt252 operation felt252_add([36], [41]) -> ([50]) with the user-controlled parameters: [41], which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function felt252_overflow::felt252_overflow::Felt252Overflow::__wrapper__bad_add_controlled uses the felt252 operation felt252_add([49], [48]) -> ([50]) with the user-controlled parameters: [49],[48], which is not overflow/underflow safe",
+        message: "The function felt252_overflow::felt252_overflow::Felt252Overflow::__wrapper__bad_add_controlled uses the felt252 operation felt252_add([50], [49]) -> ([51]) with the user-controlled parameters: [50],[49], which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
@@ -57,7 +57,7 @@ input_file: tests/detectors/felt252_overflow.cairo
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function felt252_overflow::felt252_overflow::Felt252Overflow::__wrapper__bad_sub_controlled uses the felt252 operation felt252_sub([32], [39]) -> ([40]) with the user-controlled parameters: [39], which is not overflow/underflow safe",
+        message: "The function felt252_overflow::felt252_overflow::Felt252Overflow::__wrapper__bad_sub_controlled uses the felt252 operation felt252_sub([33], [40]) -> ([41]) with the user-controlled parameters: [40], which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,

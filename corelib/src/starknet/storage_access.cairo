@@ -26,7 +26,6 @@
 use core::RangeCheck;
 use core::array::ArrayTrait;
 use core::byte_array::ByteArrayTrait;
-use core::bytes_31::BYTES_IN_BYTES31;
 use core::option::OptionTrait;
 use core::serde::Serde;
 use core::traits::{Into, TryInto};
@@ -682,13 +681,16 @@ impl TupleNextStore<
     }
 }
 
+const RESULT_OK_INDICATOR: felt252 = 0;
+const RESULT_ERR_INDICATOR: felt252 = 1;
+
 impl ResultStore<T, E, +Store<T>, +Store<E>, +Drop<T>, +Drop<E>> of Store<Result<T, E>> {
     #[inline]
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult<Result<T, E>> {
         let idx = Store::<felt252>::read(address_domain, base)?;
-        if idx == 0 {
+        if idx == RESULT_OK_INDICATOR {
             starknet::SyscallResult::Ok(Ok(Store::read_at_offset(address_domain, base, 1_u8)?))
-        } else if idx == 1 {
+        } else if idx == RESULT_ERR_INDICATOR {
             starknet::SyscallResult::Ok(Err(Store::read_at_offset(address_domain, base, 1_u8)?))
         } else {
             starknet::SyscallResult::Err(array!['Incorrect index:'])
@@ -701,11 +703,11 @@ impl ResultStore<T, E, +Store<T>, +Store<E>, +Drop<T>, +Drop<E>> of Store<Result
     ) -> SyscallResult<()> {
         match value {
             Ok(x) => {
-                Store::write(address_domain, base, 0)?;
+                Store::write(address_domain, base, RESULT_OK_INDICATOR)?;
                 Store::write_at_offset(address_domain, base, 1_u8, x)?;
             },
             Err(x) => {
-                Store::write(address_domain, base, 1)?;
+                Store::write(address_domain, base, RESULT_ERR_INDICATOR)?;
                 Store::write_at_offset(address_domain, base, 1_u8, x)?;
             },
         }
@@ -717,11 +719,11 @@ impl ResultStore<T, E, +Store<T>, +Store<E>, +Drop<T>, +Drop<E>> of Store<Result
         address_domain: u32, base: StorageBaseAddress, offset: u8,
     ) -> SyscallResult<Result<T, E>> {
         let idx = Store::<felt252>::read_at_offset(address_domain, base, offset)?;
-        if idx == 0 {
+        if idx == RESULT_OK_INDICATOR {
             starknet::SyscallResult::Ok(
                 Ok(Store::read_at_offset(address_domain, base, offset + 1_u8)?),
             )
-        } else if idx == 1 {
+        } else if idx == RESULT_ERR_INDICATOR {
             starknet::SyscallResult::Ok(
                 Err(Store::read_at_offset(address_domain, base, offset + 1_u8)?),
             )
@@ -736,11 +738,11 @@ impl ResultStore<T, E, +Store<T>, +Store<E>, +Drop<T>, +Drop<E>> of Store<Result
     ) -> SyscallResult<()> {
         match value {
             Ok(x) => {
-                Store::write_at_offset(address_domain, base, offset, 0)?;
+                Store::write_at_offset(address_domain, base, offset, RESULT_OK_INDICATOR)?;
                 Store::write_at_offset(address_domain, base, offset + 1_u8, x)?;
             },
             Err(x) => {
-                Store::write_at_offset(address_domain, base, offset, 0)?;
+                Store::write_at_offset(address_domain, base, offset, RESULT_ERR_INDICATOR)?;
                 Store::write_at_offset(address_domain, base, offset + 1_u8, x)?;
             },
         }
@@ -753,13 +755,16 @@ impl ResultStore<T, E, +Store<T>, +Store<E>, +Drop<T>, +Drop<E>> of Store<Result
     }
 }
 
+const OPTION_NONE_INDICATOR: felt252 = 0;
+const OPTION_SOME_INDICATOR: felt252 = 1;
+
 impl OptionStore<T, +Store<T>, +Drop<T>> of Store<Option<T>> {
     #[inline]
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult<Option<T>> {
         let idx = Store::<felt252>::read(address_domain, base)?;
-        if idx == 1 {
+        if idx == OPTION_SOME_INDICATOR {
             starknet::SyscallResult::Ok(Some(Store::read_at_offset(address_domain, base, 1_u8)?))
-        } else if idx == 0 {
+        } else if idx == OPTION_NONE_INDICATOR {
             starknet::SyscallResult::Ok(None)
         } else {
             starknet::SyscallResult::Err(array!['Incorrect index:'])
@@ -770,10 +775,10 @@ impl OptionStore<T, +Store<T>, +Drop<T>> of Store<Option<T>> {
     fn write(address_domain: u32, base: StorageBaseAddress, value: Option<T>) -> SyscallResult<()> {
         match value {
             Some(x) => {
-                Store::write(address_domain, base, 1)?;
+                Store::write(address_domain, base, OPTION_SOME_INDICATOR)?;
                 Store::write_at_offset(address_domain, base, 1_u8, x)?;
             },
-            None(_) => { Store::write(address_domain, base, 0)?; },
+            None(_) => { Store::write(address_domain, base, OPTION_NONE_INDICATOR)?; },
         }
         starknet::SyscallResult::Ok(())
     }
@@ -783,11 +788,11 @@ impl OptionStore<T, +Store<T>, +Drop<T>> of Store<Option<T>> {
         address_domain: u32, base: StorageBaseAddress, offset: u8,
     ) -> SyscallResult<Option<T>> {
         let idx = Store::<felt252>::read_at_offset(address_domain, base, offset)?;
-        if idx == 1 {
+        if idx == OPTION_SOME_INDICATOR {
             starknet::SyscallResult::Ok(
                 Some(Store::read_at_offset(address_domain, base, offset + 1_u8)?),
             )
-        } else if idx == 0 {
+        } else if idx == OPTION_NONE_INDICATOR {
             starknet::SyscallResult::Ok(None)
         } else {
             starknet::SyscallResult::Err(array!['Incorrect index:'])
@@ -800,10 +805,12 @@ impl OptionStore<T, +Store<T>, +Drop<T>> of Store<Option<T>> {
     ) -> SyscallResult<()> {
         match value {
             Some(x) => {
-                Store::write_at_offset(address_domain, base, offset, 1)?;
+                Store::write_at_offset(address_domain, base, offset, OPTION_SOME_INDICATOR)?;
                 Store::write_at_offset(address_domain, base, offset + 1_u8, x)?;
             },
-            None(_x) => { Store::write_at_offset(address_domain, base, offset, 0)?; },
+            None(_x) => {
+                Store::write_at_offset(address_domain, base, offset, OPTION_NONE_INDICATOR)?;
+            },
         }
         starknet::SyscallResult::Ok(())
     }
@@ -876,9 +883,7 @@ fn inner_read_byte_array(address_domain: u32, address: StorageAddress) -> Syscal
         .try_into() else {
         return Err(array!['Invalid ByteArray length']);
     };
-    let (mut remaining_full_words, pending_word_len) = core::DivRem::div_rem(
-        len, BYTES_IN_BYTES31.try_into().unwrap(),
-    );
+    let (mut remaining_full_words, pending_word_len) = crate::byte_array::len_parts(len);
     let mut chunk = 0;
     let mut chunk_base = inner_byte_array_pointer(address, chunk);
     let mut index_in_chunk = 0_u8;
@@ -910,6 +915,9 @@ fn inner_read_byte_array(address_domain: u32, address: StorageAddress) -> Syscal
         let pending_word = starknet::syscalls::storage_read_syscall(
             address_domain, storage_address_from_base_and_offset(chunk_base, index_in_chunk),
         )?;
+        if !core::byte_array::is_valid_pending_word(pending_word, pending_word_len) {
+            return Err(array!['Invalid pending word']);
+        }
         result.pending_word = pending_word;
         result.pending_word_len = pending_word_len;
     }

@@ -125,64 +125,6 @@ pub(crate) impl U128IntoBytes31 of Into<u128, bytes31> {
     }
 }
 
-/// Splits a `bytes31` into two `bytes31`s at the given index (LSB's index is 0).
-/// The input `bytes31` and the output `bytes31`s are represented using `felt252`s to improve
-/// performance.
-///
-/// Note: this function assumes that:
-/// 1. `word` is validly convertible to a `bytes31` which has no more than `len` bytes of data.
-/// 2. `index <= len`.
-/// 3. `len <= BYTES_IN_BYTES31`.
-/// If these assumptions are not met, it can corrupt the `bytes31`. Thus, this should be a
-/// private function. We could add masking/assertions but it would be more expensive.
-pub(crate) fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252, felt252) {
-    if index == 0 {
-        return (0, word);
-    }
-    if index == len {
-        return (word, 0);
-    }
-
-    let u256 { low, high } = word.into();
-
-    if index == BYTES_IN_U128 {
-        return (low.into(), high.into());
-    }
-
-    if len <= BYTES_IN_U128 {
-        let result = split_u128(low, index);
-        return (result.low.into(), result.high.into());
-    }
-
-    // len > BYTES_IN_U128
-    if index < BYTES_IN_U128 {
-        let low_result = split_u128(low, index);
-        let right = high.into() * one_shift_left_bytes_u128(BYTES_IN_U128 - index).into()
-            + low_result.high.into();
-        return (low_result.low.into(), right);
-    }
-
-    // len > BYTES_IN_U128 && index > BYTES_IN_U128
-
-    let high_result = split_u128(high, index - BYTES_IN_U128);
-    let left = high_result.low.into() * POW_2_128 + low.into();
-    return (left, high_result.high.into());
-}
-
-
-/// Returns `1 << (8 * n_bytes)` as `felt252`, assuming that `n_bytes < BYTES_IN_BYTES31`.
-///
-/// Note: if `n_bytes >= BYTES_IN_BYTES31`, the behavior is undefined. If one wants to
-/// assert that in the callsite, it's sufficient to assert that `n_bytes != BYTES_IN_BYTES31`
-/// because if `n_bytes > 31` then `n_bytes - 16 > 15` and `one_shift_left_bytes_u128` would panic.
-pub(crate) fn one_shift_left_bytes_felt252(n_bytes: usize) -> felt252 {
-    if let Some(n_bytes_second_word) = n_bytes.checked_sub(BYTES_IN_U128) {
-        one_shift_left_bytes_u128(n_bytes_second_word).into() * POW_2_128
-    } else {
-        one_shift_left_bytes_u128(n_bytes).into()
-    }
-}
-
 /// Returns `1 << (8 * n_bytes)` as `u128`, where `n_bytes` must be < `BYTES_IN_U128`.
 ///
 /// Panics if `n_bytes >= BYTES_IN_U128`.
