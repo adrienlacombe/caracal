@@ -1,0 +1,20 @@
+---
+source: tests/integration_tests.rs
+assertion_line: 23
+expression: results
+input_file: tests/detectors/controlled_replace_class.cairo
+---
+[
+    Result {
+        impact: High,
+        name: "controlled-replace-class",
+        confidence: Medium,
+        message: "replace_class_syscall with user controlled class hash in controlled_replace_class::controlled_replace_class::ReplaceClassContract::__wrapper__bad_direct\n replace_class_syscall([5], [2], [15]) { fallthrough([22], [23]) 41([24], [25], [26]) }",
+    },
+    Result {
+        impact: High,
+        name: "controlled-replace-class",
+        confidence: Medium,
+        message: "replace_class_syscall with user controlled class hash in controlled_replace_class::controlled_replace_class::ReplaceClassContract::__wrapper__bad_indirect\n replace_class_syscall([5], [2], [15]) { fallthrough([22], [23]) 118([24], [25], [26]) }",
+    },
+]

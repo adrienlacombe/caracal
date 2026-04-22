@@ -1,6 +1,7 @@
 use self::detector::Detector;
 
 pub mod controlled_library_call;
+pub mod controlled_replace_class;
 pub mod dead_code;
 pub mod detector;
 pub mod felt252_overflow;
@@ -19,6 +20,7 @@ pub fn get_detectors() -> Vec<Box<dyn Detector>> {
     vec![
         Box::<use_after_pop_front::UseAfterPopFront>::default(),
         Box::<controlled_library_call::ControlledLibraryCall>::default(),
+        Box::<controlled_replace_class::ControlledReplaceClass>::default(),
         Box::<unused_events::UnusedEvents>::default(),
         Box::<dead_code::DeadCode>::default(),
         Box::<unused_arguments::UnusedArguments>::default(),
