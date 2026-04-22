@@ -2155,4 +2155,67 @@ mod bounded_int {
         assert!(test_constrain_helper::<u129, U128_UPPER>(upcast(bi_const::<U128_UPPER>())));
         assert!(test_constrain_helper::<u129, U128_UPPER>(upcast(bi_const::<U129_MAX>())));
     }
+
+    #[test]
+    fn test_trim() {
+        use core::internal::OptionRev;
+        assert!(bounded_int::trim_min::<u8>(0) == OptionRev::None);
+        assert!(bounded_int::trim_min::<u8>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<u8>(0xff) == OptionRev::None);
+        assert!(bounded_int::trim_max::<u8>(0xfe) == OptionRev::Some(0xfe));
+        assert!(bounded_int::trim_min::<i8>(-0x80) == OptionRev::None);
+        assert!(bounded_int::trim_min::<i8>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<i8>(0x7f) == OptionRev::None);
+        assert!(bounded_int::trim_max::<i8>(1) == OptionRev::Some(1));
+
+        assert!(bounded_int::trim_min::<u16>(0) == OptionRev::None);
+        assert!(bounded_int::trim_min::<u16>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<u16>(0xffff) == OptionRev::None);
+        assert!(bounded_int::trim_max::<u16>(0xfffe) == OptionRev::Some(0xfffe));
+        assert!(bounded_int::trim_min::<i16>(-0x8000) == OptionRev::None);
+        assert!(bounded_int::trim_min::<i16>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<i16>(0x7fff) == OptionRev::None);
+        assert!(bounded_int::trim_max::<i16>(1) == OptionRev::Some(1));
+
+        assert!(bounded_int::trim_min::<u32>(0) == OptionRev::None);
+        assert!(bounded_int::trim_min::<u32>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<u32>(0xffffffff) == OptionRev::None);
+        assert!(bounded_int::trim_max::<u32>(0xfffffffe) == OptionRev::Some(0xfffffffe));
+        assert!(bounded_int::trim_min::<i32>(-0x80000000) == OptionRev::None);
+        assert!(bounded_int::trim_min::<i32>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<i32>(0x7fffffff) == OptionRev::None);
+        assert!(bounded_int::trim_max::<i32>(1) == OptionRev::Some(1));
+
+        assert!(bounded_int::trim_min::<u64>(0) == OptionRev::None);
+        assert!(bounded_int::trim_min::<u64>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<u64>(0xffffffffffffffff) == OptionRev::None);
+        assert!(
+            bounded_int::trim_max::<u64>(0xfffffffffffffffe) == OptionRev::Some(0xfffffffffffffffe),
+        );
+        assert!(bounded_int::trim_min::<i64>(-0x8000000000000000) == OptionRev::None);
+        assert!(bounded_int::trim_min::<i64>(1) == OptionRev::Some(1));
+        assert!(bounded_int::trim_max::<i64>(0x7fffffffffffffff) == OptionRev::None);
+        assert!(bounded_int::trim_max::<i64>(1) == OptionRev::Some(1));
+
+        assert!(bounded_int::trim_min::<u128>(0) == OptionRev::None);
+        assert!(bounded_int::trim_min::<u128>(1) == OptionRev::Some(1));
+        assert!(
+            bounded_int::trim_max::<u128>(0xffffffffffffffffffffffffffffffff) == OptionRev::None,
+        );
+        assert!(
+            bounded_int::trim_max::<
+                u128,
+            >(
+                0xfffffffffffffffffffffffffffffffe,
+            ) == OptionRev::Some(0xfffffffffffffffffffffffffffffffe),
+        );
+        assert!(
+            bounded_int::trim_min::<i128>(-0x80000000000000000000000000000000) == OptionRev::None,
+        );
+        assert!(bounded_int::trim_min::<i128>(1) == OptionRev::Some(1));
+        assert!(
+            bounded_int::trim_max::<i128>(0x7fffffffffffffffffffffffffffffff) == OptionRev::None,
+        );
+        assert!(bounded_int::trim_max::<i128>(1) == OptionRev::Some(1));
+    }
 }

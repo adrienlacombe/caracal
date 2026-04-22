@@ -9,13 +9,13 @@ input_file: tests/detectors/tx_origin.cairo
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function tx_origin::tx_origin::TxOrigin::__wrapper__bad uses the felt252 operation felt252_sub([50], [51]) -> ([52]), which is not overflow/underflow safe",
+        message: "The function tx_origin::tx_origin::TxOrigin::__wrapper__bad uses the felt252 operation felt252_sub([55], [56]) -> ([57]), which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function tx_origin::tx_origin::TxOrigin::__wrapper__bad_indirect uses the felt252 operation felt252_sub([50], [51]) -> ([52]), which is not overflow/underflow safe",
+        message: "The function tx_origin::tx_origin::TxOrigin::__wrapper__bad_indirect uses the felt252 operation felt252_sub([55], [56]) -> ([57]), which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
