@@ -9,19 +9,19 @@ input_file: tests/detectors/unchecked_l1_handler_from.cairo
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__bad uses the felt252 operation felt252_add([33], [34]) -> ([35]) with the user-controlled parameters: [33], which is not overflow/underflow safe",
+        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__bad uses the felt252 operation felt252_add([29], [30]) -> ([31]) with the user-controlled parameters: [29], which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__good3 uses the felt252 operation felt252_add([41], [42]) -> ([43]) with the user-controlled parameters: [41], which is not overflow/underflow safe",
+        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__good3 uses the felt252 operation felt252_add([37], [38]) -> ([39]) with the user-controlled parameters: [37], which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::check_recursive uses the felt252 operation felt252_add([3], [27]) -> ([28]), which is not overflow/underflow safe",
+        message: "The function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::check_recursive uses the felt252 operation felt252_add([3], [23]) -> ([24]), which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,

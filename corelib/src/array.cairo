@@ -33,7 +33,7 @@
 //!
 //! ```
 //! let mut arr = array![1, 2];
-//! let one = arr.pop_front(); // Returns Option::Some(1)
+//! let one = arr.pop_front(); // Returns Some(1)
 //! ```
 //!
 //! Arrays support indexing (through the [`IndexView`] trait):
@@ -61,22 +61,21 @@
 //!
 //! [`append`]: ArrayTrait::append
 
-#[feature("deprecated-index-traits")]
-use crate::traits::IndexView;
-
+use crate::RangeCheck;
 use crate::box::BoxTrait;
 #[allow(unused_imports)]
 use crate::gas::withdraw_gas;
+use crate::iter::Iterator;
+use crate::metaprogramming::TypeEqual;
 #[allow(unused_imports)]
 use crate::option::OptionTrait;
 use crate::serde::Serde;
-use crate::metaprogramming::TypeEqual;
-use crate::iter::Iterator;
-use crate::RangeCheck;
-
-/// A collection of elements of the same type continuous in memory.
-#[derive(Drop)]
+#[feature("deprecated-index-traits")]
+use crate::traits::IndexView;
+/// A collection of elements of the same type contiguous in memory.
 pub extern type Array<T>;
+
+impl ArrayDrop<T, +Drop<T>> of Drop<Array<T>>;
 
 extern fn array_new<T>() -> Array<T> nopanic;
 extern fn array_append<T>(ref arr: Array<T>, value: T) nopanic;
@@ -147,43 +146,43 @@ pub impl ArrayImpl<T> of ArrayTrait<T> {
     /// ```
     fn append_span<+Clone<T>, +Drop<T>>(ref self: Array<T>, mut span: Span<T>) {
         match span.pop_front() {
-            Option::Some(current) => {
+            Some(current) => {
                 self.append(current.clone());
                 self.append_span(span);
             },
-            Option::None => {},
-        };
+            None => {},
+        }
     }
 
     /// Pops a value from the front of the array.
-    /// Returns `Option::Some(value)` if the array is not empty, `Option::None` otherwise.
+    /// Returns `Some(value)` if the array is not empty, `None` otherwise.
     ///
     /// # Examples
     ///
     /// ```
     /// let mut arr = array![2, 3, 4];
-    /// assert!(arr.pop_front() == Option::Some(2));
-    /// assert!(arr.pop_front() == Option::Some(3));
-    /// assert!(arr.pop_front() == Option::Some(4));
+    /// assert!(arr.pop_front() == Some(2));
+    /// assert!(arr.pop_front() == Some(3));
+    /// assert!(arr.pop_front() == Some(4));
     /// assert!(arr.pop_front().is_none());
     /// ```
     #[inline]
     fn pop_front(ref self: Array<T>) -> Option<T> nopanic {
         match array_pop_front(ref self) {
-            Option::Some(x) => Option::Some(x.unbox()),
-            Option::None => Option::None,
+            Some(x) => Some(x.unbox()),
+            None => None,
         }
     }
 
     /// Pops a value from the front of the array.
     /// Returns an option containing the remaining array and the value removed if the array is
-    /// not empty, otherwise `Option::None` and drops the array.
+    /// not empty, otherwise `None` and drops the array.
     ///
     /// # Examples
     ///
     /// ```
     /// let arr = array![2, 3, 4];
-    /// assert!(arr.pop_front_consume() == Option::Some((array![3, 4], 2)));
+    /// assert!(arr.pop_front_consume() == Some((array![3, 4], 2)));
     ///
     /// let arr: Array<u8> = array![];
     /// assert!(arr.pop_front_consume().is_none());
@@ -191,13 +190,13 @@ pub impl ArrayImpl<T> of ArrayTrait<T> {
     #[inline]
     fn pop_front_consume(self: Array<T>) -> Option<(Array<T>, T)> nopanic {
         match array_pop_front_consume(self) {
-            Option::Some((arr, x)) => Option::Some((arr, x.unbox())),
-            Option::None => Option::None,
+            Some((arr, x)) => Some((arr, x.unbox())),
+            None => None,
         }
     }
 
     /// Returns an option containing a box of a snapshot of the element at the given 'index'
-    /// if the array contains this index, 'Option::None' otherwise.
+    /// if the array contains this index, 'None' otherwise.
     ///
     /// Element at index 0 is the front of the array.
     ///
@@ -259,8 +258,8 @@ pub impl ArrayImpl<T> of ArrayTrait<T> {
     fn is_empty(self: @Array<T>) -> bool {
         let mut snapshot = self;
         match array_snapshot_pop_front(ref snapshot) {
-            Option::Some(_) => false,
-            Option::None => true,
+            Some(_) => false,
+            None => true,
         }
     }
 
@@ -336,11 +335,11 @@ impl ArraySerde<T, +Serde<T>, +Drop<T>> of Serde<Array<T>> {
 
 fn serialize_array_helper<T, +Serde<T>, +Drop<T>>(mut input: Span<T>, ref output: Array<felt252>) {
     match input.pop_front() {
-        Option::Some(value) => {
+        Some(value) => {
             value.serialize(ref output);
             serialize_array_helper(input, ref output);
         },
-        Option::None => {},
+        None => {},
     }
 }
 
@@ -348,13 +347,13 @@ fn deserialize_array_helper<T, +Serde<T>, +Drop<T>>(
     ref serialized: Span<felt252>, mut curr_output: Array<T>, remaining: felt252,
 ) -> Option<Array<T>> {
     if remaining == 0 {
-        return Option::Some(curr_output);
+        return Some(curr_output);
     }
     curr_output.append(Serde::deserialize(ref serialized)?);
     deserialize_array_helper(ref serialized, curr_output, remaining - 1)
 }
 
-/// A span is a view into a continuous collection of the same type - such as `Array`.
+/// A span is a view into a contiguous collection of the same type - such as `Array`.
 /// It is a structure with a single field that holds a snapshot of an array.
 /// `Span` implements the `Copy` and the `Drop` traits.
 pub struct Span<T> {
@@ -427,7 +426,7 @@ impl SpanFelt252Serde of Serde<Span<felt252>> {
         let length: u32 = (*serialized.pop_front()?).try_into()?;
         let res = serialized.slice(0, length);
         serialized = serialized.slice(length, serialized.len() - length);
-        Option::Some(res)
+        Some(res)
     }
 }
 
@@ -459,7 +458,7 @@ impl SpanSerde<T, +Serde<T>, +Drop<T>, -TypeEqual<felt252, T>> of Serde<Span<T>>
     fn deserialize(ref serialized: Span<felt252>) -> Option<Span<T>> {
         let length = *serialized.pop_front()?;
         let mut arr = array_new();
-        Option::Some(deserialize_array_helper(ref serialized, arr, length)?.span())
+        Some(deserialize_array_helper(ref serialized, arr, length)?.span())
     }
 }
 
@@ -467,13 +466,13 @@ impl SpanSerde<T, +Serde<T>, +Drop<T>, -TypeEqual<felt252, T>> of Serde<Span<T>>
 #[generate_trait]
 pub impl SpanImpl<T> of SpanTrait<T> {
     /// Pops a value from the front of the span.
-    /// Returns `Option::Some(@value)` if the array is not empty, `Option::None` otherwise.
+    /// Returns `Some(@value)` if the array is not empty, `None` otherwise.
     ///
     /// # Examples
     ///
     /// ```
     /// let mut span = array![1, 2, 3].span();
-    /// assert!(span.pop_front() == Option::Some(@1));
+    /// assert!(span.pop_front() == Some(@1));
     /// ```
     #[inline]
     fn pop_front(ref self: Span<T>) -> Option<@T> {
@@ -481,18 +480,18 @@ pub impl SpanImpl<T> of SpanTrait<T> {
         let item = array_snapshot_pop_front(ref snapshot);
         self = Span { snapshot };
         match item {
-            Option::Some(x) => Option::Some(x.unbox()),
-            Option::None => Option::None,
+            Some(x) => Some(x.unbox()),
+            None => None,
         }
     }
 
     /// Pops a value from the back of the span.
-    /// Returns `Option::Some(@value)` if the array is not empty, `Option::None` otherwise.
+    /// Returns `Some(@value)` if the array is not empty, `None` otherwise.
     ///
     /// # Examples
     /// ```
     /// let mut span = array![1, 2, 3].span();
-    /// assert!(span.pop_back() == Option::Some(@3));
+    /// assert!(span.pop_back() == Some(@3));
     /// ```
     #[inline]
     fn pop_back(ref self: Span<T>) -> Option<@T> {
@@ -500,14 +499,14 @@ pub impl SpanImpl<T> of SpanTrait<T> {
         let item = array_snapshot_pop_back(ref snapshot);
         self = Span { snapshot };
         match item {
-            Option::Some(x) => Option::Some(x.unbox()),
-            Option::None => Option::None,
+            Some(x) => Some(x.unbox()),
+            None => None,
         }
     }
 
     /// Pops multiple values from the front of the span.
     /// Returns an option containing a snapshot of a box that contains the values as a fixed-size
-    /// array if the action completed successfully, 'Option::None' otherwise.
+    /// array if the action completed successfully, 'None' otherwise.
     ///
     /// # Examples
     ///
@@ -523,7 +522,7 @@ pub impl SpanImpl<T> of SpanTrait<T> {
 
     /// Pops multiple values from the back of the span.
     /// Returns an option containing a snapshot of a box that contains the values as a fixed-size
-    /// array if the action completed successfully, 'Option::None' otherwise.
+    /// array if the action completed successfully, 'None' otherwise.
     ///
     /// # Examples
     ///
@@ -531,14 +530,14 @@ pub impl SpanImpl<T> of SpanTrait<T> {
     /// let mut span = array![1, 2, 3].span();
     /// let result = *(span.multi_pop_back::<2>().unwrap());
     /// let unboxed_result = result.unbox();
-    /// assert!(unboxed_result == [2, 3]);;
+    /// assert!(unboxed_result == [2, 3]);
     /// ```
     fn multi_pop_back<const SIZE: usize>(ref self: Span<T>) -> Option<@Box<[T; SIZE]>> {
         array_snapshot_multi_pop_back(ref self.snapshot)
     }
 
     /// Returns an option containing a box of a snapshot of the element at the given 'index'
-    /// if the span contains this index, 'Option::None' otherwise.
+    /// if the span contains this index, 'None' otherwise.
     ///
     /// Element at index 0 is the front of the array.
     ///
@@ -615,8 +614,8 @@ pub impl SpanImpl<T> of SpanTrait<T> {
     fn is_empty(self: Span<T>) -> bool {
         let mut snapshot = self.snapshot;
         match array_snapshot_pop_front(ref snapshot) {
-            Option::Some(_) => false,
-            Option::None => true,
+            Some(_) => false,
+            None => true,
         }
     }
 }
@@ -734,7 +733,7 @@ impl SpanTryIntoFixedSizedArray<
 
 impl SpanTryIntoEmptyFixedSizedArray<T, +Drop<T>> of TryInto<Span<T>, @Box<[T; 0]>> {
     /// Returns an option of a snapshot of a box that contains an empty fixed-size array if the span
-    /// is empty, and `Option::None` otherwise.
+    /// is empty, and `None` otherwise.
     ///
     /// # Examples
     ///
@@ -745,9 +744,9 @@ impl SpanTryIntoEmptyFixedSizedArray<T, +Drop<T>> of TryInto<Span<T>, @Box<[T; 0
     #[inline]
     fn try_into(self: Span<T>) -> Option<@Box<[T; 0]>> {
         if self.is_empty() {
-            Option::Some(@BoxTrait::new([]))
+            Some(@BoxTrait::new([]))
         } else {
-            Option::None
+            None
         }
     }
 }
@@ -759,10 +758,10 @@ impl ArrayTCloneImpl<T, +Clone<T>, +Drop<T>> of Clone<Array<T>> {
         let mut span = self.span();
         loop {
             match span.pop_front() {
-                Option::Some(v) => { response.append(v.clone()); },
-                Option::None => { break (); },
-            };
-        };
+                Some(v) => { response.append(v.clone()); },
+                None => { break (); },
+            }
+        }
         response
     }
 }
@@ -782,13 +781,11 @@ impl SpanPartialEq<T, +PartialEq<T>> of PartialEq<Span<T>> {
         let mut rhs_span = *rhs;
         loop {
             match lhs_span.pop_front() {
-                Option::Some(lhs_v) => {
-                    if lhs_v != rhs_span.pop_front().unwrap() {
-                        break false;
-                    }
-                },
-                Option::None => { break true; },
-            };
+                Some(lhs_v) => { if lhs_v != rhs_span.pop_front().unwrap() {
+                    break false;
+                } },
+                None => { break true; },
+            }
         }
     }
 }
@@ -804,7 +801,7 @@ impl SpanIterCopy<T> of Copy<SpanIter<T>>;
 impl SpanIterator<T> of Iterator<SpanIter<T>> {
     /// The type of the elements being iterated over.
     type Item = @T;
-    /// Advances the iterator and returns the next value. Returns `Option::None` when iteration is
+    /// Advances the iterator and returns the next value. Returns `None` when iteration is
     /// finished.
     fn next(ref self: SpanIter<T>) -> Option<@T> {
         self.span.pop_front()
@@ -813,8 +810,15 @@ impl SpanIterator<T> of Iterator<SpanIter<T>> {
 
 impl SpanIntoIterator<T> of crate::iter::IntoIterator<Span<T>> {
     type IntoIter = SpanIter<T>;
-    fn into_iter(self: Span<T>) -> SpanIter<T> {
+    fn into_iter(self: Span<T>) -> Self::IntoIter {
         SpanIter { span: self }
+    }
+}
+
+impl SnapshotSpanIntoIterator<T> of crate::iter::IntoIterator<@Span<T>> {
+    type IntoIter = crate::array::SpanIter<T>;
+    fn into_iter(self: @Span<T>) -> Self::IntoIter {
+        (*self).into_iter()
     }
 }
 
@@ -833,7 +837,7 @@ impl ArrayIterClone<T, +crate::clone::Clone<T>, +Drop<T>> of crate::clone::Clone
 impl ArrayIterator<T> of Iterator<ArrayIter<T>> {
     /// The type of the elements being iterated over.
     type Item = T;
-    /// Advances the iterator and returns the next value. Returns `Option::None` when iteration is
+    /// Advances the iterator and returns the next value. Returns `None` when iteration is
     /// finished.
     fn next(ref self: ArrayIter<T>) -> Option<T> {
         self.array.pop_front()
@@ -842,8 +846,49 @@ impl ArrayIterator<T> of Iterator<ArrayIter<T>> {
 
 impl ArrayIntoIterator<T> of crate::iter::IntoIterator<Array<T>> {
     type IntoIter = ArrayIter<T>;
-    fn into_iter(self: Array<T>) -> ArrayIter<T> {
+    fn into_iter(self: Array<T>) -> Self::IntoIter {
         ArrayIter { array: self }
+    }
+}
+
+impl SnapshotArrayIntoIterator<T> of crate::iter::IntoIterator<@Array<T>> {
+    type IntoIter = SpanIter<T>;
+    fn into_iter(self: @Array<T>) -> Self::IntoIter {
+        self.span().into_iter()
+    }
+}
+
+impl ArrayFromIterator<T, +Drop<T>> of crate::iter::FromIterator<Array<T>, T> {
+    fn from_iter<
+        I,
+        impl IntoIter: IntoIterator<I>,
+        +core::metaprogramming::TypeEqual<IntoIter::Iterator::Item, T>,
+        +Destruct<IntoIter::IntoIter>,
+        +Destruct<I>,
+    >(
+        iter: I,
+    ) -> Array<T> {
+        let mut arr = array![];
+        for elem in iter {
+            arr.append(elem);
+        }
+        arr
+    }
+}
+
+impl ArrayExtend<T, +Drop<T>> of crate::iter::Extend<Array<T>, T> {
+    fn extend<
+        I,
+        impl IntoIter: IntoIterator<I>,
+        +TypeEqual<IntoIter::Iterator::Item, T>,
+        +Destruct<IntoIter::IntoIter>,
+        +Destruct<I>,
+    >(
+        ref self: Array<T>, iter: I,
+    ) {
+        for elem in iter.into_iter() {
+            self.append(elem);
+        };
     }
 }
 

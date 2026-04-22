@@ -13,11 +13,13 @@
 //! assert!(hash == [0x185f8db3, 0x2271fe25, 0xf561a6fc, 0x938b2e26, 0x4306ec30, 0x4eda5180,
 //! 0x7d17648, 0x26381969]);
 //! ```
-use crate::starknet::SyscallResultTrait;
+use starknet::SyscallResultTrait;
 
 /// A handle to the state of a SHA-256 hash.
-#[derive(Copy, Drop)]
 pub(crate) extern type Sha256StateHandle;
+
+impl Sha256StateHandleCopy of Copy<Sha256StateHandle>;
+impl Sha256StateHandleDrop of Drop<Sha256StateHandle>;
 
 /// Initializes a new SHA-256 state handle with the given initial state.
 extern fn sha256_state_handle_init(state: Box<[u32; 8]>) -> Sha256StateHandle nopanic;
@@ -59,9 +61,9 @@ pub fn compute_sha256_u32_array(
     let mut input = input.span();
     let mut state = sha256_state_handle_init(BoxTrait::new(SHA256_INITIAL_STATE));
 
-    while let Option::Some(chunk) = input.multi_pop_front() {
+    while let Some(chunk) = input.multi_pop_front() {
         state = starknet::syscalls::sha256_process_block_syscall(state, *chunk).unwrap_syscall();
-    };
+    }
 
     sha256_state_handle_digest(state).unbox()
 }
@@ -91,7 +93,7 @@ pub fn compute_sha256_byte_array(arr: @ByteArray) -> [u32; 8] {
             + arr.at(index).unwrap().into() * 0x1000000;
         word_arr.append(word);
         index = index + 4;
-    };
+    }
 
     let last = match rem {
         0 => 0,

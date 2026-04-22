@@ -8,6 +8,7 @@ use crate::compilation::utils::felt252_serde::sierra_from_felt252s;
 use crate::compilation::utils::replacer::SierraProgramDebugReplacer;
 use crate::core::core_unit::CoreOpts;
 use cairo_lang_compiler::db::RootDatabase;
+use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
 use cairo_lang_compiler::CompilerConfig;
 use cairo_lang_filesystem::db::init_dev_corelib;
@@ -51,12 +52,13 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     };
 
     let mut db = RootDatabase::builder()
-        .with_plugin_suite(starknet_plugin_suite())
+        .with_default_plugin_suite(starknet_plugin_suite())
         .build()?;
     init_dev_corelib(&mut db, corelib);
 
     let compiler_config = CompilerConfig {
         replace_ids: true,
+        diagnostics_reporter: DiagnosticsReporter::stderr().allow_warnings(),
         ..Default::default()
     };
 

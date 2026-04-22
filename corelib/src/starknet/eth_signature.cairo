@@ -7,13 +7,13 @@
 use core::keccak::keccak_u256s_be_inputs;
 use core::option::OptionTrait;
 #[allow(unused_imports)]
-use starknet::{
-    EthAddress,
-    secp256_trait::{
-        Secp256Trait, Secp256PointTrait, recover_public_key, is_signature_entry_valid, Signature,
-    },
-    secp256k1::Secp256k1Point, SyscallResult, SyscallResultTrait,
+use starknet::secp256_trait::{
+    Secp256PointTrait, Secp256Trait, Signature, is_signature_entry_valid, recover_public_key,
 };
+#[allow(unused_imports)]
+use starknet::secp256k1::Secp256k1Point;
+#[allow(unused_imports)]
+use starknet::{EthAddress, SyscallResult, SyscallResultTrait};
 
 /// Asserts that an Ethereum signature is valid for a given message hash and Ethereum address.
 /// Also verifies that the `r` and `s` components of the signature are in the range `[1, N)`,
@@ -34,9 +34,9 @@ use starknet::{
 /// # Examples
 ///
 /// ```
-/// use core::starknet::eth_address::EthAddress;
-/// use core::starknet::eth_signature::verify_eth_signature;
-/// use core::starknet::secp256_trait::Signature;
+/// use starknet::eth_address::EthAddress;
+/// use starknet::eth_signature::verify_eth_signature;
+/// use starknet::secp256_trait::Signature;
 ///
 /// let msg_hash = 0xe888fbb4cf9ae6254f19ba12e6d9af54788f195a6f509ca3e934f78d7a71dd85;
 /// let r = 0x4c8e4fbc1fbb1dece52185e532812c4f7a5f81cf3ee10044320a0d03b62d3e9a;
@@ -49,8 +49,8 @@ use starknet::{
 /// ```
 pub fn verify_eth_signature(msg_hash: u256, signature: Signature, eth_address: EthAddress) {
     match is_eth_signature_valid(:msg_hash, :signature, :eth_address) {
-        Result::Ok(()) => {},
-        Result::Err(err) => core::panic_with_felt252(err),
+        Ok(()) => {},
+        Err(err) => core::panic_with_felt252(err),
     }
 }
 
@@ -73,9 +73,9 @@ pub fn verify_eth_signature(msg_hash: u256, signature: Signature, eth_address: E
 /// # Examples
 ///
 /// ```
-/// use core::starknet::eth_address::EthAddress;
-/// use core::starknet::eth_signature::is_eth_signature_valid;
-/// use core::starknet::secp256_trait::Signature;
+/// use starknet::eth_address::EthAddress;
+/// use starknet::eth_signature::is_eth_signature_valid;
+/// use starknet::secp256_trait::Signature;
 ///
 /// let msg_hash = 0xe888fbb4cf9ae6254f19ba12e6d9af54788f195a6f509ca3e934f78d7a71dd85;
 /// let r = 0x4c8e4fbc1fbb1dece52185e532812c4f7a5f81cf3ee10044320a0d03b62d3e9a;
@@ -90,18 +90,18 @@ pub fn is_eth_signature_valid(
     msg_hash: u256, signature: Signature, eth_address: EthAddress,
 ) -> Result<(), felt252> {
     if !is_signature_entry_valid::<Secp256k1Point>(signature.r) {
-        return Result::Err('Signature out of range');
+        return Err('Signature out of range');
     }
     if !is_signature_entry_valid::<Secp256k1Point>(signature.s) {
-        return Result::Err('Signature out of range');
+        return Err('Signature out of range');
     }
 
     let public_key_point = recover_public_key::<Secp256k1Point>(:msg_hash, :signature).unwrap();
     let calculated_eth_address = public_key_point_to_eth_address(:public_key_point);
     if eth_address != calculated_eth_address {
-        return Result::Err('Invalid signature');
+        return Err('Invalid signature');
     }
-    Result::Ok(())
+    Ok(())
 }
 
 /// Converts a public key point to its corresponding Ethereum address.
@@ -120,9 +120,9 @@ pub fn is_eth_signature_valid(
 /// # Examples
 ///
 /// ```
-/// use core::starknet::eth_signature::public_key_point_to_eth_address;
-/// use core::starknet::secp256k1::Secp256k1Point;
-/// use core::starknet::secp256_trait::Secp256Trait;
+/// use starknet::eth_signature::public_key_point_to_eth_address;
+/// use starknet::secp256k1::Secp256k1Point;
+/// use starknet::secp256_trait::Secp256Trait;
 ///
 /// let public_key: Secp256k1Point = Secp256Trait::secp256_ec_get_point_from_x_syscall(
 ///     0xa9a02d48081294b9bb0d8740d70d3607feb20876964d432846d9b9100b91eefd, false,

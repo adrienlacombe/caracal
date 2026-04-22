@@ -39,8 +39,11 @@
 
 /// A `Box` is a type that points to a wrapped value.
 /// It allows for cheap moving around of the value, as its size is small, and may wrap a large size.
-#[derive(Copy, Drop)]
 pub extern type Box<T>;
+
+impl BoxCopy<T, +Copy<T>> of Copy<Box<T>>;
+impl BoxDrop<T, +Drop<T>> of Drop<Box<T>>;
+
 
 // These functions are only exposed in the corelib through the trait below since calling them
 // directly with tuples panics due to auto unpacking of the tuple.
@@ -101,7 +104,7 @@ pub impl BoxImpl<T> of BoxTrait<T> {
 impl BoxDeref<T> of crate::ops::Deref<Box<T>> {
     /// The target type after dereferencing.
     type Target = T;
-    /// Takes a `Box<T>`, deferences it and returns a value of type `T`.
+    /// Takes a `Box<T>`, dereferences it and returns a value of type `T`.
     ///
     /// # Examples
     ///

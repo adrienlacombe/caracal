@@ -1,7 +1,7 @@
-#[feature("deprecated-bounded-int-trait")]
-use crate::{integer, integer::{u512_safe_div_rem_by_u256, u512}};
-use crate::test::test_utils::{assert_eq, assert_ne, assert_le, assert_lt, assert_gt, assert_ge};
-use crate::num::traits::{Bounded, Sqrt, WideMul, WideSquare, WrappingSub};
+use crate::integer;
+use crate::integer::{u512, u512_safe_div_rem_by_u256};
+use crate::num::traits::{Bounded, Pow, Sqrt, WideMul, WideSquare, WrappingSub};
+use crate::test::test_utils::{assert_eq, assert_ge, assert_gt, assert_le, assert_lt, assert_ne};
 
 #[test]
 fn test_u8_operators() {
@@ -761,7 +761,7 @@ fn test_u512_safe_div_rem_by_u256() {
 fn test_u512_try_into_u256() {
     assert!(
         u512 { limb0: 1, limb1: 2, limb2: 0, limb3: 0 }
-            .try_into() == Option::Some(0x200000000000000000000000000000001_u256),
+            .try_into() == Some(0x200000000000000000000000000000001_u256),
     );
     assert!(u512 { limb0: 1, limb1: 2, limb2: 3, limb3: 0 }.try_into() == Option::<u256>::None);
     assert!(u512 { limb0: 1, limb1: 2, limb2: 0, limb3: 4 }.try_into() == Option::<u256>::None);
@@ -924,7 +924,7 @@ fn cast_subtype_valid<
         && max_sub_as_super.try_into().unwrap() == max_sub
 }
 
-/// Checks that `A::max()` is castable to `B`, and `A::max() + 1` is in `B`s range, and not
+/// Checks that `A::MAX` is castable to `B`, and `A::MAX + 1` is in `B`s range, and not
 /// castable back to `A`.
 fn validate_max_strictly_contained<
     A,
@@ -945,7 +945,7 @@ fn validate_max_strictly_contained<
 ) {
     let max_a: A = Bounded::MAX;
     let max_a_as_b: B = max_a.try_into().expect(err);
-    assert(Option::Some(max_a) == max_a_as_b.try_into(), err);
+    assert(Some(max_a) == max_a_as_b.try_into(), err);
     assert(is_out_of_range::<A>(max_a_as_b + 1.try_into().unwrap()), err);
 }
 
@@ -970,7 +970,7 @@ fn validate_min_strictly_contained<
 ) {
     let min_sub: A = Bounded::MIN;
     let min_sub_as_super: B = min_sub.try_into().expect(err);
-    assert(Option::Some(min_sub) == min_sub_as_super.try_into(), err);
+    assert(Some(min_sub) == min_sub_as_super.try_into(), err);
     assert(is_out_of_range::<A>(min_sub_as_super - 1.try_into().unwrap()), err);
 }
 
@@ -1873,24 +1873,23 @@ fn test_signed_int_diff() {
 }
 
 mod bounded_int {
-    use crate::internal::{
-        bounded_int,
-        bounded_int::{BoundedInt, AddHelper, SubHelper, MulHelper, DivRemHelper, ConstrainHelper},
-    };
     use crate::RangeCheck;
+    use crate::internal::bounded_int;
+    use crate::internal::bounded_int::{
+        AddHelper, BoundedInt, ConstrainHelper, DivRemHelper, MulHelper, SubHelper, UnitInt,
+    };
 
     extern fn downcast<T, S>(index: T) -> Option<S> implicits(RangeCheck) nopanic;
     extern fn upcast<T, S>(index: T) -> S nopanic;
 
-    type SingleInt<const VALUE: felt252> = BoundedInt<VALUE, VALUE>;
     const U128_UPPER: felt252 = 0x100000000000000000000000000000000;
     const U128_MAX: felt252 = U128_UPPER - 1;
 
     /// Is `value` the equivalent value of `expected` in `T` type.
     fn is_some_of<T>(value: Option<T>, expected: felt252) -> bool {
         match value {
-            Option::Some(v) => upcast(v) == expected,
-            Option::None => false,
+            Some(v) => upcast(v) == expected,
+            None => false,
         }
     }
 
@@ -1899,36 +1898,24 @@ mod bounded_int {
         is_some_of(downcast::<felt252, T>(value), value)
     }
 
-    /// Is `value` the equivalent value (as `felt252`) of `expected` in `T` type.
-    fn downcast_invalid<T, S>(value: T) -> bool {
-        match downcast::<T, S>(value) {
-            Option::Some(v) => {
-                // Just as a drop for `v`.
-                upcast::<_, felt252>(v);
-                false
-            },
-            Option::None => true,
-        }
-    }
-
     #[test]
     fn test_felt252_downcasts() {
-        assert!(downcast_invalid::<felt252, SingleInt<0>>(1));
-        assert!(felt252_downcast_valid::<SingleInt<0>>(0));
-        assert!(downcast_invalid::<felt252, SingleInt<0>>(-1));
-        assert!(downcast_invalid::<felt252, SingleInt<-1>>(-2));
-        assert!(felt252_downcast_valid::<SingleInt<-1>>(-1));
-        assert!(downcast_invalid::<felt252, SingleInt<-1>>(0));
-        assert!(downcast_invalid::<felt252, BoundedInt<120, 180>>(119));
+        assert!(!felt252_downcast_valid::<UnitInt<0>>(1));
+        assert!(felt252_downcast_valid::<UnitInt<0>>(0));
+        assert!(!felt252_downcast_valid::<UnitInt<0>>(-1));
+        assert!(!felt252_downcast_valid::<UnitInt<-1>>(-2));
+        assert!(felt252_downcast_valid::<UnitInt<-1>>(-1));
+        assert!(!felt252_downcast_valid::<UnitInt<-1>>(0));
+        assert!(!felt252_downcast_valid::<BoundedInt<120, 180>>(119));
         assert!(felt252_downcast_valid::<BoundedInt<120, 180>>(120));
         assert!(felt252_downcast_valid::<BoundedInt<120, 180>>(180));
-        assert!(downcast_invalid::<felt252, BoundedInt<120, 180>>(181));
-        assert!(downcast_invalid::<felt252, SingleInt<U128_MAX>>(U128_MAX - 1));
-        assert!(felt252_downcast_valid::<SingleInt<U128_MAX>>(U128_MAX));
-        assert!(downcast_invalid::<felt252, SingleInt<U128_MAX>>(U128_MAX + 1));
-        assert!(downcast_invalid::<felt252, SingleInt<U128_UPPER>>(U128_UPPER - 1));
-        assert!(felt252_downcast_valid::<SingleInt<U128_UPPER>>(U128_UPPER));
-        assert!(downcast_invalid::<felt252, SingleInt<U128_UPPER>>(U128_UPPER + 1));
+        assert!(!felt252_downcast_valid::<BoundedInt<120, 180>>(181));
+        assert!(!felt252_downcast_valid::<UnitInt<U128_MAX>>(U128_MAX - 1));
+        assert!(felt252_downcast_valid::<UnitInt<U128_MAX>>(U128_MAX));
+        assert!(!felt252_downcast_valid::<UnitInt<U128_MAX>>(U128_MAX + 1));
+        assert!(!felt252_downcast_valid::<UnitInt<U128_UPPER>>(U128_UPPER - 1));
+        assert!(felt252_downcast_valid::<UnitInt<U128_UPPER>>(U128_UPPER));
+        assert!(!felt252_downcast_valid::<UnitInt<U128_UPPER>>(U128_UPPER + 1));
     }
 
     const ONE_MINUS_P: felt252 = -0x800000000000011000000000000000000000000000000000000000000000000;
@@ -1936,14 +1923,14 @@ mod bounded_int {
     // Full prime range, but where the max element is 0.
     type OneMinusPToZero = BoundedInt<ONE_MINUS_P, 0>;
 
-    fn bi_const<const V: felt252>() -> SingleInt<V> {
+    fn bi_const<const V: felt252>() -> UnitInt<V> {
         downcast(V).unwrap()
     }
 
     #[test]
     fn test_bounded_int_casts() {
         assert!(downcast::<OneMinusPToZero, u8>(upcast(bi_const::<-1>())).is_none());
-        assert!(downcast::<OneMinusPToZero, u8>(0) == Option::Some(0));
+        assert!(downcast::<OneMinusPToZero, u8>(0) == Some(0));
         assert!(downcast::<OneMinusPToZero, u8>(upcast(bi_const::<ONE_MINUS_P>())).is_none());
         assert!(downcast::<BoundedInt<100, 200>, BoundedInt<120, 180>>(119).is_none());
         assert!(is_some_of(downcast::<BoundedInt<100, 200>, BoundedInt<120, 180>>(120), 120));
@@ -2057,7 +2044,7 @@ mod bounded_int {
     mod helpers {
         pub impl DivRemHelperImpl<
             const A: felt252, const B: felt252, const MAX_Q: felt252, const MAX_R: felt252,
-        > of super::DivRemHelper<super::BoundedInt<0, A>, super::BoundedInt<B, B>> {
+        > of super::DivRemHelper<super::BoundedInt<0, A>, super::UnitInt<B>> {
             type DivT = super::BoundedInt<0, MAX_Q>;
             type RemT = super::BoundedInt<0, MAX_R>;
         }
@@ -2067,9 +2054,9 @@ mod bounded_int {
         const A_MAX: felt252,
         const B: felt252,
         const A: felt252,
-        +DivRemHelper<BoundedInt<0, A_MAX>, BoundedInt<B, B>>,
+        +DivRemHelper<BoundedInt<0, A_MAX>, UnitInt<B>>,
     >(
-        a: BoundedInt<A, A>,
+        a: UnitInt<A>,
     ) -> (felt252, felt252) {
         bounded_int_div_rem_unwrapped::<BoundedInt<0, A_MAX>>(upcast(a), bi_const::<B>())
     }
@@ -2124,8 +2111,8 @@ mod bounded_int {
         value: T,
     ) -> bool {
         match bounded_int::constrain::<_, BOUNDARY>(value) {
-            Result::Ok(result) => upcast(result),
-            Result::Err(result) => upcast(result),
+            Ok(result) => upcast(result),
+            Err(result) => upcast(result),
         } == upcast::<_, felt252>(value)
     }
 
@@ -2218,4 +2205,115 @@ mod bounded_int {
         );
         assert!(bounded_int::trim_max::<i128>(1) == OptionRev::Some(1));
     }
+}
+
+#[test]
+fn test_upcast_in_const() {
+    const AS_U8: u8 = 10;
+    const AS_U16: u16 = AS_U8.into();
+    assert_eq!(AS_U16, 10);
+}
+
+#[test]
+fn test_downcast_in_const() {
+    const IN_RANGE: u16 = 10;
+    const OUT_OF_RANGE: u16 = 300;
+    const IN_RANGE_AS_U8: Option<u8> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_U8: Option<u8> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_U8, Some(10));
+    assert_eq!(OUT_OF_RANGE_AS_U8, None);
+}
+
+#[test]
+fn test_const_into_felt252_casts() {
+    const U8: u8 = 0;
+    const U8_AS_FELT: felt252 = U8.into();
+    assert_eq!(U8_AS_FELT, 0);
+
+    const U16: u16 = 0;
+    const U16_AS_FELT: felt252 = U16.into();
+    assert_eq!(U16_AS_FELT, 0);
+
+    const U32: u32 = 0;
+    const U32_AS_FELT: felt252 = U32.into();
+    assert_eq!(U32_AS_FELT, 0);
+
+    const U64: u64 = 0;
+    const U64_AS_FELT: felt252 = U64.into();
+    assert_eq!(U64_AS_FELT, 0);
+
+    const U128: u128 = 0;
+    const U128_AS_FELT: felt252 = U128.into();
+    assert_eq!(U128_AS_FELT, 0);
+
+    const I8: u8 = 0;
+    const I8_AS_FELT: felt252 = I8.into();
+    assert_eq!(I8_AS_FELT, 0);
+
+    const I16: i16 = 0;
+    const I16_AS_FELT: felt252 = I16.into();
+    assert_eq!(I16_AS_FELT, 0);
+
+    const I32: i32 = 0;
+    const I32_AS_FELT: felt252 = I32.into();
+    assert_eq!(I32_AS_FELT, 0);
+
+    const I64: i64 = 0;
+    const I64_AS_FELT: felt252 = I64.into();
+    assert_eq!(I64_AS_FELT, 0);
+
+    const I128: i128 = 0;
+    const I128_AS_FELT: felt252 = I128.into();
+    assert_eq!(I128_AS_FELT, 0);
+}
+
+#[test]
+fn test_const_from_felt252_casts() {
+    const IN_RANGE: felt252 = 0;
+    const OUT_OF_RANGE: felt252 = 2_felt252.pow(200);
+
+    const IN_RANGE_AS_U8: Option<u8> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_U8: Option<u8> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_U8, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_U8, None);
+
+    const IN_RANGE_AS_U16: Option<u16> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_U16: Option<u16> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_U16, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_U16, None);
+
+    const IN_RANGE_AS_U32: Option<u32> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_U32: Option<u32> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_U32, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_U32, None);
+
+    const IN_RANGE_AS_U64: Option<u64> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_U64: Option<u64> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_U64, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_U64, None);
+
+    const IN_RANGE_AS_I8: Option<i8> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_I8: Option<i8> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_I8, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_I8, None);
+
+    const IN_RANGE_AS_I16: Option<i16> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_I16: Option<i16> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_I16, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_I16, None);
+
+    const IN_RANGE_AS_I32: Option<i32> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_I32: Option<i32> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_I32, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_I32, None);
+
+    const IN_RANGE_AS_I64: Option<i64> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_I64: Option<i64> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_I64, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_I64, None);
+
+    const IN_RANGE_AS_I128: Option<i128> = IN_RANGE.try_into();
+    const OUT_OF_RANGE_AS_I128: Option<i128> = OUT_OF_RANGE.try_into();
+    assert_eq!(IN_RANGE_AS_I128, Some(0));
+    assert_eq!(OUT_OF_RANGE_AS_I128, None);
 }

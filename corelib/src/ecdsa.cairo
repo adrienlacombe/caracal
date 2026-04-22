@@ -13,14 +13,14 @@
 //! * x = 0x1ef15c18599971b7beced415a40f0c7deacfd9b0d1819e03d723d8bc943cfca
 //! * y = 0x5668060aa49730b7be4801df46ec62de53ecd11abe43a32873000c36e8dc1f
 
-use crate::{ec, ec::{EcPoint, EcPointTrait, EcStateTrait}};
+use crate::ec::{EcPoint, EcPointTrait, EcStateTrait};
 #[allow(unused_imports)]
 use crate::option::OptionTrait;
-use crate::math;
 #[allow(unused_imports)]
 use crate::traits::{Into, TryInto};
 #[allow(unused_imports)]
 use crate::zeroable::IsZeroResult;
+use crate::{ec, math};
 
 /// Verifies an ECDSA signature against a message hash and public key.
 ///
@@ -69,21 +69,21 @@ pub fn check_ecdsa_signature(
 
     // Check that the public key is the x coordinate of a point on the curve and get such a point.
     let public_key_point = match EcPointTrait::new_nz_from_x(public_key) {
-        Option::Some(point) => point,
-        Option::None => { return false; },
+        Some(point) => point,
+        None => { return false; },
     };
 
     // Check that `r` is the x coordinate of a point on the curve and get such a point.
     // Note that this ensures that `r != 0`.
     let signature_r_point = match EcPointTrait::new_nz_from_x(signature_r) {
-        Option::Some(point) => point,
-        Option::None => { return false; },
+        Some(point) => point,
+        None => { return false; },
     };
 
     // Retrieve the generator point.
     let gen_point = match EcPointTrait::new_nz(ec::stark_curve::GEN_X, ec::stark_curve::GEN_Y) {
-        Option::Some(point) => point,
-        Option::None => { return false; },
+        Some(point) => point,
+        None => { return false; },
     };
 
     // Initialize an EC state.
@@ -101,8 +101,8 @@ pub fn check_ecdsa_signature(
     let mut sR_state = init_ec.clone();
     sR_state.add_mul(signature_s, signature_r_point);
     let sR_x = match sR_state.finalize_nz() {
-        Option::Some(pt) => pt.x(),
-        Option::None => { return false; },
+        Some(pt) => pt.x(),
+        None => { return false; },
     };
 
     // Calculate a state with `z * G`.
@@ -113,15 +113,15 @@ pub fn check_ecdsa_signature(
     let mut rQ_state = init_ec;
     rQ_state.add_mul(signature_r, public_key_point);
     let rQ = match rQ_state.finalize_nz() {
-        Option::Some(pt) => pt,
+        Some(pt) => pt,
         // The zero case is not actually possible, as `signature_r` isn't 0.
-        Option::None => { return false; },
+        None => { return false; },
     };
 
     // Check the `(zG + rQ).x = sR.x` case.
     let mut zG_plus_eQ_state = zG_state.clone();
     zG_plus_eQ_state.add(rQ);
-    if let Option::Some(pt) = zG_plus_eQ_state.finalize_nz() {
+    if let Some(pt) = zG_plus_eQ_state.finalize_nz() {
         if pt.x() == sR_x {
             return true;
         }
@@ -130,7 +130,7 @@ pub fn check_ecdsa_signature(
     // Check the `(zG - rQ).x = sR.x` case.
     let mut zG_minus_eQ_state = zG_state;
     zG_minus_eQ_state.sub(rQ);
-    if let Option::Some(pt) = zG_minus_eQ_state.finalize_nz() {
+    if let Some(pt) = zG_minus_eQ_state.finalize_nz() {
         if pt.x() == sR_x {
             return true;
         }
@@ -173,7 +173,7 @@ pub fn recover_public_key(
 ) -> Option<felt252> {
     let mut signature_r_point = EcPointTrait::new_from_x(signature_r)?;
     let y: u256 = signature_r_point.try_into()?.y().into();
-    // If the actual the parity of the actual y is different than requested, flip the parity.
+    // If the actual parity of the actual y is different than requested, flip the parity.
     if (y.low & 1 == 1) != y_parity {
         signature_r_point = -signature_r_point;
     }
@@ -203,5 +203,5 @@ pub fn recover_public_key(
     let s_div_rR: EcPoint = signature_r_point.mul(s_div_r);
     let z_div_rG: EcPoint = gen_point.mul(z_div_r);
 
-    Option::Some((s_div_rR - z_div_rG).try_into()?.x())
+    Some((s_div_rR - z_div_rG).try_into()?.x())
 }

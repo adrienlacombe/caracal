@@ -1,9 +1,8 @@
 use crate::circuit::{
-    RangeCheck96, AddMod, MulMod, u96, CircuitElement, CircuitInput, circuit_add, circuit_sub,
-    circuit_mul, circuit_inverse, EvalCircuitTrait, u384, CircuitOutputsTrait, CircuitModulus,
-    AddInputResultTrait, CircuitInputs,
+    AddInputResultTrait, AddMod, CircuitElement, CircuitInput, CircuitInputs, CircuitModulus,
+    CircuitOutputsTrait, EvalCircuitTrait, MulMod, RangeCheck96, circuit_add, circuit_inverse,
+    circuit_mul, circuit_sub, u384, u96,
 };
-
 use crate::num::traits::Zero;
 use crate::traits::TryInto;
 
@@ -97,7 +96,7 @@ fn test_from_u384() {
     let limb3 = 0;
     assert!(
         u384 { limb0, limb1, limb2, limb3 }
-            .try_into() == Option::Some(
+            .try_into() == Some(
                 0x100000023000000450000006700000089000000ab000000cd000000ef0000000_u256,
             ),
     );
@@ -111,7 +110,7 @@ fn test_from_u384() {
     let limb3 = 0;
     assert!(
         u384 { limb0, limb1, limb2, limb3 }
-            .try_into() == Option::Some(0x10000002300000045000000670000008_u128),
+            .try_into() == Some(0x10000002300000045000000670000008_u128),
     );
     assert!(u384 { limb0, limb1: 0x110000002, limb2, limb3 }.try_into() == Option::<u128>::None);
     assert!(u384 { limb0, limb1, limb2: 1, limb3 }.try_into() == Option::<u128>::None);
@@ -124,12 +123,12 @@ fn test_fill_inputs_loop() {
     let in2 = CircuitElement::<CircuitInput<1>> {};
     let add = circuit_add(in1, in2);
 
-    let mut inputs: Array::<[u96; 4]> = array![[1, 0, 0, 0], [2, 0, 0, 0]];
+    let mut inputs: Array<[u96; 4]> = array![[1, 0, 0, 0], [2, 0, 0, 0]];
     let mut circuit_inputs = (add,).new_inputs();
 
-    while let Option::Some(input) = inputs.pop_front() {
+    while let Some(input) = inputs.pop_front() {
         circuit_inputs = circuit_inputs.next(input);
-    };
+    }
 
     let modulus = TryInto::<_, CircuitModulus>::try_into([55, 0, 0, 0]).unwrap();
     circuit_inputs.done().eval(modulus).unwrap();
@@ -153,7 +152,7 @@ fn test_u384_serde() {
 
     let mut serialized = serialized.span();
 
-    assert!(Serde::<u384>::deserialize(ref serialized) == Option::Some(value));
+    assert!(Serde::<u384>::deserialize(ref serialized) == Some(value));
 }
 
 #[test]

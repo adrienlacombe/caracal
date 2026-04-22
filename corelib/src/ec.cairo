@@ -51,12 +51,12 @@
 //! let _result = state.finalize();
 //! ```
 
+use crate::RangeCheck;
 #[allow(unused_imports)]
 use crate::array::ArrayTrait;
 #[allow(unused_imports)]
 use crate::traits::{Into, TryInto};
 use crate::zeroable::IsZeroResult;
-use crate::RangeCheck;
 
 pub mod stark_curve {
     /// The STARK Curve is defined by the equation y² ≡ x³ + α·x + β (mod p).
@@ -77,8 +77,10 @@ pub extern type EcOp;
 ///
 /// Points can be created using [`EcPointTrait::new`] or [`EcPointTrait::new_from_x`].
 /// The zero point represents the point at infinity.
-#[derive(Copy, Drop)]
 pub extern type EcPoint;
+
+impl EcPointCopy of Copy<EcPoint>;
+impl EcPointDrop of Drop<EcPoint>;
 
 /// A non-zero point on the STARK curve (cannot be the point at infinity).
 pub type NonZeroEcPoint = NonZero<EcPoint>;
@@ -108,8 +110,8 @@ impl EcPointTryIntoNonZero of TryInto<EcPoint, NonZeroEcPoint> {
     #[inline]
     fn try_into(self: EcPoint) -> Option<NonZeroEcPoint> {
         match ec_point_is_zero(self) {
-            IsZeroResult::Zero => Option::None,
-            IsZeroResult::NonZero(p_nz) => Option::Some(p_nz),
+            IsZeroResult::Zero => None,
+            IsZeroResult::NonZero(p_nz) => Some(p_nz),
         }
     }
 }
@@ -119,8 +121,9 @@ impl EcPointTryIntoNonZero of TryInto<EcPoint, NonZeroEcPoint> {
 /// Use this to perform multiple point operations efficiently.
 /// Initialize with [`EcStateTrait::init`], add points with [`EcStateTrait::add`]
 /// or [`EcStateTrait::add_mul`], and finalize with [`EcStateTrait::finalize`].
-#[derive(Drop)]
 pub extern type EcState;
+
+impl EcStateDrop of Drop<EcState>;
 
 mod internal {
     impl EcStateCopy of Copy<super::EcState>;
@@ -218,8 +221,8 @@ pub impl EcStateImpl of EcStateTrait {
     #[inline]
     fn finalize(self: EcState) -> EcPoint {
         match self.finalize_nz() {
-            Option::Some(p_nz) => p_nz.into(),
-            Option::None => ec_point_zero(),
+            Some(p_nz) => p_nz.into(),
+            None => ec_point_zero(),
         }
     }
 }
@@ -247,7 +250,7 @@ pub impl EcPointImpl of EcPointTrait {
     /// ```
     #[inline]
     fn new(x: felt252, y: felt252) -> Option<EcPoint> {
-        Option::Some(Self::new_nz(:x, :y)?.into())
+        Some(Self::new_nz(:x, :y)?.into())
     }
 
     /// Creates a new NonZero EC point from its (x, y) coordinates.
@@ -280,7 +283,7 @@ pub impl EcPointImpl of EcPointTrait {
     /// ```
     #[inline]
     fn new_from_x(x: felt252) -> Option<EcPoint> {
-        Option::Some(Self::new_nz_from_x(:x)?.into())
+        Some(Self::new_nz_from_x(:x)?.into())
     }
 
     /// Creates a new NonZero EC point from its x coordinate.
@@ -359,12 +362,12 @@ pub impl EcPointImpl of EcPointTrait {
     /// The resulting point after scalar multiplication.
     fn mul(self: EcPoint, scalar: felt252) -> EcPoint {
         match self.try_into() {
-            Option::Some(self_nz) => {
+            Some(self_nz) => {
                 let mut state = EcStateTrait::init();
                 state.add_mul(scalar, self_nz);
                 state.finalize()
             },
-            Option::None => self,
+            None => self,
         }
     }
 }
@@ -380,12 +383,12 @@ impl EcPointAdd of Add<EcPoint> {
     // TODO(lior): Implement using a libfunc to make it more efficient.
     fn add(lhs: EcPoint, rhs: EcPoint) -> EcPoint {
         let lhs_nz = match lhs.try_into() {
-            Option::Some(pt) => pt,
-            Option::None => { return rhs; },
+            Some(pt) => pt,
+            None => { return rhs; },
         };
         let rhs_nz = match rhs.try_into() {
-            Option::Some(pt) => pt,
-            Option::None => { return lhs; },
+            Some(pt) => pt,
+            None => { return lhs; },
         };
         let mut state = ec_state_init();
         state.add(lhs_nz);

@@ -48,7 +48,7 @@
 //! ```
 
 #[feature("deprecated-index-traits")]
-use crate::traits::{Index, Default, Felt252DictValue};
+use crate::traits::{Default, Felt252DictValue, Index};
 
 /// A dictionary that maps `felt252` keys to a value of any type.
 pub extern type Felt252Dict<T>;
@@ -62,9 +62,8 @@ pub extern type SquashedFelt252Dict<T>;
 pub extern type Felt252DictEntry<T>;
 
 impl SquashedFelt252DictDrop<T, +Drop<T>> of Drop<SquashedFelt252Dict<T>>;
-
-use crate::{RangeCheck, SegmentArena};
 use crate::gas::GasBuiltin;
+use crate::{RangeCheck, SegmentArena};
 
 pub(crate) extern fn felt252_dict_new<T>() -> Felt252Dict<T> implicits(SegmentArena) nopanic;
 
@@ -84,6 +83,10 @@ extern fn felt252_dict_entry_finalize<T>(
 pub(crate) extern fn felt252_dict_squash<T>(
     dict: Felt252Dict<T>,
 ) -> SquashedFelt252Dict<T> implicits(RangeCheck, GasBuiltin, SegmentArena) nopanic;
+
+extern fn squashed_felt252_dict_entries<T>(
+    dict: SquashedFelt252Dict<T>,
+) -> Array<(felt252, T, T)> nopanic;
 
 /// Basic trait for the `Felt252Dict` type.
 pub trait Felt252DictTrait<T> {
@@ -154,10 +157,9 @@ impl Felt252DictImpl<T, +Felt252DictValue<T>> of Felt252DictTrait<T> {
 
     #[inline]
     fn get<+Copy<T>>(ref self: Felt252Dict<T>, key: felt252) -> T {
-        let (entry, prev_value) = felt252_dict_entry_get(self, key);
-        let return_value = prev_value;
-        self = felt252_dict_entry_finalize(entry, prev_value);
-        return_value
+        let (entry, value) = felt252_dict_entry_get(self, key);
+        self = felt252_dict_entry_finalize(entry, value);
+        value
     }
 
     #[inline(never)]
@@ -237,7 +239,7 @@ impl Felt252DictEntryDestruct<T, +Drop<T>, +Felt252DictValue<T>> of Destruct<Fel
     /// related to is squashed before going out of scope.
     /// `destruct` is automatically called when a dictionary entry goes out of scope.
     #[inline]
-    fn destruct(self: Felt252DictEntry::<T>) nopanic {
+    fn destruct(self: Felt252DictEntry<T>) nopanic {
         felt252_dict_entry_finalize(self, Felt252DictValue::zero_default());
     }
 }
@@ -263,5 +265,45 @@ impl Felt252DictIndex<
     #[inline]
     fn index(ref self: Felt252Dict<T>, index: felt252) -> T {
         self.get(index)
+    }
+}
+
+impl Felt252DictFromIterator<
+    T, +Destruct<T>, +Destruct<Felt252Dict<T>>, +Felt252DictValue<T>,
+> of crate::iter::FromIterator<Felt252Dict<T>, (felt252, T)> {
+    /// Constructs a `Felt252Dict<T>` from an iterator of (felt252, T) key-value pairs.
+    /// If the iterator contains repeating keys,
+    /// only the last value in the iterator for each key will be kept.
+    fn from_iter<
+        I,
+        impl IntoIter: IntoIterator<I>,
+        +core::metaprogramming::TypeEqual<IntoIter::Iterator::Item, (felt252, T)>,
+        +Destruct<IntoIter::IntoIter>,
+        +Destruct<I>,
+    >(
+        iter: I,
+    ) -> Felt252Dict<T> {
+        let mut dict = Default::default();
+        for (key, value) in iter {
+            dict.insert(key, value);
+        }
+        dict
+    }
+}
+
+/// Basic trait for the `SquashedFelt252Dict` type.
+#[generate_trait]
+pub impl SquashedFelt252DictImpl<T> of SquashedFelt252DictTrait<T> {
+    /// Returns an array of `(key, first_value, last_value)` tuples.
+    /// The first value is always 0.
+    ///
+    /// # Example
+    /// ```
+    /// let squashed_dict = dict.squash();
+    /// let entries = squashed_dict.entries();
+    /// ```
+    #[inline]
+    fn into_entries(self: SquashedFelt252Dict<T>) -> Array<(felt252, T, T)> {
+        squashed_felt252_dict_entries(self)
     }
 }

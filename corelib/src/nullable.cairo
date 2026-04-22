@@ -32,12 +32,13 @@
 //! ```
 
 use crate::box::BoxTrait;
-use crate::traits::Default;
-use crate::traits::Felt252DictValue;
+use crate::traits::{Default, Felt252DictValue};
 
 /// A type that can either be null or contain a boxed value.
-#[derive(Copy, Drop)]
 pub extern type Nullable<T>;
+
+impl NullableCopy<T, +Copy<T>> of Copy<Nullable<T>>;
+impl NullableDrop<T, +Drop<T>> of Drop<Nullable<T>>;
 
 /// Represents the result of matching a `Nullable` value.
 ///

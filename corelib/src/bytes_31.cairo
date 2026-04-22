@@ -14,11 +14,11 @@
 //! assert!(value[0] == 0xbb);
 //! ```
 
+use crate::RangeCheck;
 #[allow(unused_imports)]
 use crate::integer::{u128_safe_divmod, u128_to_felt252};
 #[allow(unused_imports)]
 use crate::option::OptionTrait;
-use crate::RangeCheck;
 use crate::traits::{Into, TryInto};
 
 pub(crate) const BYTES_IN_BYTES31: usize = 31;
@@ -27,8 +27,10 @@ pub(crate) const POW_2_128: felt252 = 0x100000000000000000000000000000000;
 pub(crate) const POW_2_8: u128 = 0x100;
 
 /// Represents a 31-byte fixed-size byte type.
-#[derive(Copy, Drop)]
 pub extern type bytes31;
+
+impl bytes31Copy of Copy<bytes31>;
+impl bytes31Drop of Drop<bytes31>;
 
 pub(crate) extern fn bytes31_const<const value: felt252>() -> bytes31 nopanic;
 extern fn bytes31_try_from_felt252(value: felt252) -> Option<bytes31> implicits(RangeCheck) nopanic;
@@ -88,31 +90,31 @@ pub(crate) impl Felt252TryIntoBytes31 of TryInto<felt252, bytes31> {
 impl Bytes31Serde = crate::serde::into_felt252_based::SerdeImpl<bytes31>;
 
 pub(crate) impl U8IntoBytes31 of Into<u8, bytes31> {
-    fn into(self: u8) -> bytes31 {
+    const fn into(self: u8) -> bytes31 {
         crate::integer::upcast(self)
     }
 }
 
 impl U16IntoBytes31 of Into<u16, bytes31> {
-    fn into(self: u16) -> bytes31 {
+    const fn into(self: u16) -> bytes31 {
         crate::integer::upcast(self)
     }
 }
 
 impl U32IntoBytes31 of Into<u32, bytes31> {
-    fn into(self: u32) -> bytes31 {
+    const fn into(self: u32) -> bytes31 {
         crate::integer::upcast(self)
     }
 }
 
 impl U64IntoBytes31 of Into<u64, bytes31> {
-    fn into(self: u64) -> bytes31 {
+    const fn into(self: u64) -> bytes31 {
         crate::integer::upcast(self)
     }
 }
 
 pub(crate) impl U128IntoBytes31 of Into<u128, bytes31> {
-    fn into(self: u128) -> bytes31 {
+    const fn into(self: u128) -> bytes31 {
         crate::integer::upcast(self)
     }
 }
@@ -122,11 +124,11 @@ pub(crate) impl U128IntoBytes31 of Into<u128, bytes31> {
 /// performance.
 ///
 /// Note: this function assumes that:
-/// 1. `word` is validly convertible to a `bytes31`` which has no more than `len` bytes of data.
+/// 1. `word` is validly convertible to a `bytes31` which has no more than `len` bytes of data.
 /// 2. `index <= len`.
 /// 3. `len <= BYTES_IN_BYTES31`.
-/// If these assumptions are not met, it can corrupt the `byte31`s. Thus, this should be a
-/// private function. We could add masking/assertions but it would be more expansive.
+/// If these assumptions are not met, it can corrupt the `bytes31`. Thus, this should be a
+/// private function. We could add masking/assertions but it would be more expensive.
 pub(crate) fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252, felt252) {
     if index == 0 {
         return (0, word);
@@ -232,16 +234,16 @@ impl Bytes31PartialEq of PartialEq<bytes31> {
 }
 
 mod helpers {
-    use core::internal::bounded_int::{DivRemHelper, BoundedInt, div_rem};
+    use core::internal::bounded_int::{BoundedInt, DivRemHelper, UnitInt, div_rem};
 
-    impl DivRemU128By256 of DivRemHelper<u128, BoundedInt<256, 256>> {
+    impl DivRemU128By256 of DivRemHelper<u128, UnitInt<256>> {
         type DivT = BoundedInt<0, 0xffffffffffffffffffffffffffffff>;
         type RemT = BoundedInt<0, 0xff>;
     }
 
     /// Returns the least significant byte of the given u128.
     pub fn get_lsb(value: u128) -> u8 {
-        let (_, res) = div_rem::<_, BoundedInt<256, 256>>(value, 256);
+        let (_, res) = div_rem::<_, UnitInt<256>>(value, 256);
         core::integer::upcast(res)
     }
 }

@@ -10,10 +10,10 @@
 //! for example, storing values in a contract's storage or deploying new contracts.
 
 use core::gas::GasBuiltin;
-use starknet::{
-    SyscallResult, storage_access::StorageAddress, class_hash::ClassHash,
-    contract_address::ContractAddress,
-};
+use starknet::SyscallResult;
+use starknet::class_hash::ClassHash;
+use starknet::contract_address::ContractAddress;
+use starknet::storage_access::StorageAddress;
 
 /// Calls a given contract.
 ///
@@ -79,7 +79,7 @@ pub extern fn get_block_hash_syscall(
 /// * `block_timestamp` returns the hour, rounded down to the nearest hour.
 /// * `block_number` returns the block number, rounded down to the nearest multiple of 100.
 ///
-/// [`Execution information`]: core::starknet::info::ExecutionInfo
+/// [`Execution information`]: starknet::info::ExecutionInfo
 ///
 /// # Returns
 ///
@@ -91,7 +91,7 @@ pub extern fn get_execution_info_syscall() -> SyscallResult<
 
 /// Gets information about the current execution, version 2.
 /// This syscall should not be called directly. Instead, use
-/// `core::starknet::info::get_execution_info`.
+/// `starknet::info::get_execution_info`.
 ///
 /// # Returns
 ///
@@ -211,3 +211,21 @@ pub extern fn keccak_syscall(
 pub extern fn sha256_process_block_syscall(
     state: core::sha256::Sha256StateHandle, input: Box<[u32; 16]>,
 ) -> SyscallResult<core::sha256::Sha256StateHandle> implicits(GasBuiltin, System) nopanic;
+
+/// Invokes the given entry point as a v0 meta transaction.
+///
+/// * The signature is replaced with the given signature.
+/// * The caller is the OS (address 0).
+/// * The transaction version is replaced by 0.
+/// * The transaction hash is replaced by the corresponding version-0 transaction hash.
+///
+/// The changes apply to the called contract and the inner contracts it calls.
+///
+/// NOTE: This syscall should only be used to allow support for old version-0 bound accounts,
+/// and should not be used for other purposes.
+extern fn meta_tx_v0_syscall(
+    address: ContractAddress,
+    entry_point_selector: felt252,
+    calldata: Span<felt252>,
+    signature: Span<felt252>,
+) -> starknet::SyscallResult<Span<felt252>> implicits(GasBuiltin, System) nopanic;

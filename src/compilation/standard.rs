@@ -3,6 +3,7 @@ use std::env;
 use std::process;
 
 use cairo_lang_compiler::db::RootDatabase;
+use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
 use cairo_lang_compiler::CompilerConfig;
 use cairo_lang_filesystem::db::init_dev_corelib;
@@ -59,12 +60,15 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     };
 
     let mut db = RootDatabase::builder()
-        .with_plugin_suite(starknet_plugin_suite())
+        .with_default_plugin_suite(starknet_plugin_suite())
         .build()?;
     init_dev_corelib(&mut db, corelib);
 
     let compiler_config = CompilerConfig {
         replace_ids: true,
+        // Don't fail compilation on cairo deprecation warnings emitted by the
+        // fixture contracts (e.g. `starknet::class_hash_const`).
+        diagnostics_reporter: DiagnosticsReporter::stderr().allow_warnings(),
         ..Default::default()
     };
 
@@ -78,8 +82,10 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     let mut contracts_arg = vec![];
     contracts.iter().for_each(|c| contracts_arg.push(c));
 
-    let contract_classes = compile_prepared_db(&db, &contracts_arg, compiler_config)
-        .expect("Error when compiling contracts.");
+    let contract_classes = match compile_prepared_db(&db, &contracts_arg, compiler_config) {
+        Ok(c) => c,
+        Err(e) => bail!("Error when compiling contracts: {e:?}"),
+    };
 
     let mut programs_compiled: Vec<ProgramCompiled> = vec![];
 

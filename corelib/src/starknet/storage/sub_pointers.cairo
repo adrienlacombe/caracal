@@ -1,21 +1,13 @@
-use super::{StoragePointer, Mutable, StorageAsPointer, StoragePointer0Offset};
+use super::{Mutable, StorageAsPointer, StoragePointer, StoragePointer0Offset};
 
 /// Similar to storage node, but for structs which are stored sequentially in the storage. In
-/// contrast to storage node, the fields of the struct are just offsetted from the base address of
-/// the struct.
+/// contrast to storage node, the fields of the struct are just at an offset from the base address
+/// of the struct.
 pub trait SubPointers<T> {
     /// The type of the storage pointers, generated for the struct T.
     type SubPointersType;
     /// Creates a sub pointers struct for the given storage pointer to a struct T.
     fn sub_pointers(self: StoragePointer<T>) -> Self::SubPointersType;
-}
-
-/// This makes the sub-pointers members directly accessible from a pointer to the parent struct.
-pub impl SubPointersDeref<T, +SubPointers<T>> of core::ops::Deref<StoragePointer<T>> {
-    type Target = SubPointers::<T>::SubPointersType;
-    fn deref(self: StoragePointer<T>) -> Self::Target {
-        self.sub_pointers()
-    }
 }
 
 /// A mutable version of `SubPointers`, works the same way, but on `Mutable<T>`.
@@ -24,16 +16,6 @@ pub trait SubPointersMut<T> {
     type SubPointersType;
     /// Creates a sub pointers struct for the given storage pointer to a struct T.
     fn sub_pointers_mut(self: StoragePointer<Mutable<T>>) -> Self::SubPointersType;
-}
-
-/// This makes the sub-pointers members directly accessible from a pointer to the parent struct.
-pub impl SubPointersMutDeref<
-    T, +SubPointersMut<T>,
-> of core::ops::Deref<StoragePointer<Mutable<T>>> {
-    type Target = SubPointersMut::<T>::SubPointersType;
-    fn deref(self: StoragePointer<Mutable<T>>) -> Self::Target {
-        self.sub_pointers_mut()
-    }
 }
 
 /// A trait for implementing `SubPointers` for types which are not a `StoragePointer`, such as

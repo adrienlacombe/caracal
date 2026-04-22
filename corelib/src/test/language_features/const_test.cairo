@@ -133,11 +133,41 @@ fn test_two_complex_enums() {
     );
 }
 
+#[test]
+fn test_complex_consts() {
+    const VAR_AND_MATCH_CONST: felt252 = {
+        let x = Some((1, 2_u8));
+        match x {
+            Some((v, _)) => v,
+            None => 3,
+        }
+    };
+    assert_eq!(VAR_AND_MATCH_CONST, 1);
+    const TRUE: bool = true;
+    const IF_CONST_TRUE: felt252 = if TRUE {
+        4
+    } else {
+        5
+    };
+    assert_eq!(IF_CONST_TRUE, 4);
+    const FALSE: bool = false;
+    const IF_CONST_FALSE: felt252 = if FALSE {
+        6
+    } else {
+        7
+    };
+    assert_eq!(IF_CONST_FALSE, 7);
+}
+
 mod const_starknet_consts {
     pub extern fn const_as_box<T, const SEGMENT_INDEX: felt252>() -> Box<
         (starknet::ContractAddress, starknet::ClassHash),
     > nopanic;
 }
+
+const STARKNET_CONSTS: (starknet::ContractAddress, starknet::ClassHash) = (
+    1000.try_into().unwrap(), 1001.try_into().unwrap(),
+);
 
 #[test]
 fn test_starknet_consts() {
@@ -150,6 +180,7 @@ fn test_starknet_consts() {
             >,
             0,
         >()
-            .unbox() == (1000.try_into().unwrap(), 1001.try_into().unwrap()),
+            .unbox() == STARKNET_CONSTS,
     );
 }
+

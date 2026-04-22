@@ -5,7 +5,7 @@ use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::utils::filter_builtins_from_arguments;
 use cairo_lang_sierra::extensions::{
-    core::CoreConcreteLibfunc, lib_func::ParamSignature, starknet::StarkNetConcreteLibfunc,
+    core::CoreConcreteLibfunc, lib_func::ParamSignature, starknet::StarknetConcreteLibfunc,
 };
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement, StatementIdx};
@@ -69,8 +69,8 @@ impl Detector for ControlledLibraryCall {
                             .expect("Library function not found in the registry");
 
                         // We care only about a library call
-                        if let CoreConcreteLibfunc::StarkNet(
-                            StarkNetConcreteLibfunc::LibraryCall(l),
+                        if let CoreConcreteLibfunc::Starknet(
+                            StarknetConcreteLibfunc::LibraryCall(l),
                         ) = libfunc
                         {
                             self.check_user_controlled(

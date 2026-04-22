@@ -4,29 +4,4 @@ assertion_line: 23
 expression: results
 input_file: tests/detectors/use_after_pop_front.cairo
 ---
-[
-    Result {
-        impact: Low,
-        name: "use-after-pop-front",
-        confidence: Medium,
-        message: "The array [29] is used after removing elements from it in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::__wrapper__bad_external_call",
-    },
-    Result {
-        impact: Low,
-        name: "use-after-pop-front",
-        confidence: Medium,
-        message: "The array [29] is used after removing elements from it in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::__wrapper__bad_library_call",
-    },
-    Result {
-        impact: Low,
-        name: "use-after-pop-front",
-        confidence: Medium,
-        message: "The span [31] is used after removing elements from it in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::__wrapper__bad_external_call_span",
-    },
-    Result {
-        impact: Low,
-        name: "use-after-pop-front",
-        confidence: Medium,
-        message: "The span [31] is used after removing elements from it in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::__wrapper__bad_library_call_span",
-    },
-]
+[]

@@ -16,13 +16,15 @@
 use core::gas::GasBuiltin;
 use core::option::OptionTrait;
 #[allow(unused_imports)]
-use starknet::{
-    EthAddress, secp256_trait::{Secp256Trait, Secp256PointTrait}, SyscallResult, SyscallResultTrait,
-};
+use starknet::secp256_trait::{Secp256PointTrait, Secp256Trait};
+#[allow(unused_imports)]
+use starknet::{EthAddress, SyscallResult, SyscallResultTrait};
 
 /// Represents a point on the secp256r1 elliptic curve.
-#[derive(Copy, Drop)]
 pub extern type Secp256r1Point;
+
+impl Secp256r1PointCopy of Copy<Secp256r1Point>;
+impl Secp256r1PointDrop of Drop<Secp256r1Point>;
 
 pub(crate) impl Secp256r1Impl of Secp256Trait<Secp256r1Point> {
     // TODO(yuval): change to constant once u256 constants are supported.
