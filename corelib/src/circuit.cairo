@@ -40,7 +40,7 @@ pub struct u384 {
     pub limb3: u96,
 }
 
-pub type u96 = core::internal::BoundedInt<0, 79228162514264337593543950335>;
+pub type u96 = crate::internal::bounded_int::BoundedInt<0, 79228162514264337593543950335>;
 pub extern type RangeCheck96;
 pub extern type AddMod;
 pub extern type MulMod;
@@ -58,7 +58,7 @@ impl U384TryIntoCircuitModulus of TryInto<[u96; 4], CircuitModulus> {
 }
 
 /// Converts 'T' into a 'U96Guarantee'.
-/// 'T' must be a a value that fits inside a u96, for example: u8, u96 or BoundedInt<0, 12>.
+/// 'T' must be a value that fits inside a u96, for example: u8, u96 or BoundedInt<0, 12>.
 extern fn into_u96_guarantee<T>(val: T) -> U96Guarantee nopanic;
 extern fn u96_guarantee_verify(guarantee: U96Guarantee) implicits(RangeCheck96) nopanic;
 
@@ -73,8 +73,8 @@ impl DestructU96Guarantee of Destruct<U96Guarantee> {
 extern type U96Guarantee;
 
 /// Expose the const required by the libfunc to allow the compiler const reusage.
-pub type ConstZero = core::internal::BoundedInt<0, 0>;
-pub type ConstOne = core::internal::BoundedInt<1, 1>;
+pub type ConstZero = crate::internal::bounded_int::BoundedInt<0, 0>;
+pub type ConstOne = crate::internal::bounded_int::BoundedInt<1, 1>;
 
 /// A type that creates a circuit from a tuple of outputs.
 pub extern type Circuit<Outputs>;
@@ -129,7 +129,7 @@ pub enum AddInputResult<C> {
 }
 
 mod internal {
-    use core::traits::PanicDestructForDestruct;
+    use crate::traits::PanicDestructForDestruct;
     impl AddInputResultDrop<C> of Drop<super::AddInputResult<C>>;
     impl CircuitDataDrop<C> of Drop<super::CircuitData<C>>;
     impl CircuitInputAccumulatorDrop<C> of Drop<super::CircuitInputAccumulator<C>>;
@@ -162,10 +162,10 @@ extern type CircuitPartialOutputs<C>;
 extern type CircuitDescriptor<C>;
 
 impl CircuitDescriptorDrop<C> of Drop<CircuitDescriptor<C>>;
+impl CircuitModulusCopy of Copy<CircuitModulus>;
 impl CircuitModulusDrop of Drop<CircuitModulus>;
 impl CircuitOutputsDrop<C> of Drop<CircuitOutputs<C>>;
 impl CircuitPartialOutputsDrop<C> of Drop<CircuitPartialOutputs<C>>;
-
 impl CircuitOutputsCopy<C> of Copy<CircuitOutputs<C>>;
 
 /// A wrapper for circuit elements, used to construct circuits..
@@ -195,7 +195,7 @@ trait CircuitDefinition<CES> {
     type CircuitType;
 }
 impl CircuitDefinitionImpl<
-    T, impl Unwrap: UnwrapCircuitElement<T>, +core::metaprogramming::IsTuple<T>
+    T, impl Unwrap: UnwrapCircuitElement<T>, +crate::metaprogramming::IsTuple<T>
 > of CircuitDefinition<T> {
     type CircuitType = Circuit<Unwrap::Unwrapped>;
 }
@@ -218,10 +218,12 @@ impl UnwrapCircuitElementBase<
 /// Implementation for unwrapping a tuple of `CircuitElement`s.
 impl UnwrapCircuitElementNext<
     T,
-    impl TS: core::metaprogramming::TupleSplit<T>,
+    impl TS: crate::metaprogramming::TupleSplit<T>,
     impl UnwrapHead: UnwrapCircuitElement<TS::Head>,
     impl UnwrapRest: UnwrapCircuitElement<TS::Rest>,
-    impl TEF: core::metaprogramming::TupleExtendFront<UnwrapRest::Unwrapped, UnwrapHead::Unwrapped>,
+    impl TEF: crate::metaprogramming::TupleExtendFront<
+        UnwrapRest::Unwrapped, UnwrapHead::Unwrapped
+    >,
 > of UnwrapCircuitElement<T> {
     type Unwrapped = TEF::Result;
 }
@@ -310,14 +312,14 @@ impl U384IntoCircuitInputValue of IntoCircuitInputValue<u384> {
 pub impl EvalCircuitImpl<C> of EvalCircuitTrait<C> {
     // Inlining to make sure possibly huge `C` won't be in a user function name.
     #[inline(always)]
-    fn eval(self: CircuitData<C>, modulus: CircuitModulus) -> core::circuit::EvalCircuitResult<C> {
+    fn eval(self: CircuitData<C>, modulus: CircuitModulus) -> crate::circuit::EvalCircuitResult<C> {
         self.eval_ex(get_circuit_descriptor::<C>(), modulus)
     }
     // Inlining to make sure possibly huge `C` won't be in a user function name.
     #[inline(always)]
     fn eval_ex(
         self: CircuitData<C>, descriptor: CircuitDescriptor<C>, modulus: CircuitModulus
-    ) -> core::circuit::EvalCircuitResult<C> {
+    ) -> crate::circuit::EvalCircuitResult<C> {
         eval_circuit::<C>(descriptor, self, modulus, 0, 1)
     }
 }
@@ -426,39 +428,24 @@ extern fn get_circuit_output<C, Output>(
 
 /// Helper module to convert into `u384`.
 mod conversions {
-    use core::internal::BoundedInt;
-    use core::RangeCheck;
+    use crate::internal::{
+        bounded_int, bounded_int::{BoundedInt, AddHelper, MulHelper, DivRemHelper}
+    };
+    use crate::integer::upcast;
 
-
-    trait AddHelper<Lhs, Rhs> {
-        type Result;
-    }
-    extern fn bounded_int_add<Lhs, Rhs, impl H: AddHelper<Lhs, Rhs>>(
-        lhs: Lhs, rhs: Rhs
-    ) -> H::Result nopanic;
-
-    trait MulHelper<Lhs, Rhs> {
-        type Result;
-    }
-    extern fn bounded_int_mul<Lhs, Rhs, impl H: MulHelper<Lhs, Rhs>>(
-        lhs: Lhs, rhs: Rhs
-    ) -> H::Result nopanic;
-
-    trait DivRemHelper<Lhs, Rhs> {
-        type DivT;
-        type RemT;
-    }
-    extern fn bounded_int_div_rem<Lhs, Rhs, impl H: DivRemHelper<Lhs, Rhs>>(
-        lhs: Lhs, rhs: NonZero<Rhs>,
-    ) -> (H::DivT, H::RemT) implicits(RangeCheck) nopanic;
+    use super::{u384, u96};
 
     type ConstValue<const VALUE: felt252> = BoundedInt<VALUE, VALUE>;
+    const POW128: felt252 = 0x100000000000000000000000000000000;
     const POW96: felt252 = 0x1000000000000000000000000;
+    const POW96_TYPED: ConstValue<POW96> = 0x1000000000000000000000000;
     const NZ_POW96_TYPED: NonZero<ConstValue<POW96>> = 0x1000000000000000000000000;
     const POW64: felt252 = 0x10000000000000000;
+    const POW64_TYPED: ConstValue<POW64> = 0x10000000000000000;
     const NZ_POW64_TYPED: NonZero<ConstValue<POW64>> = 0x10000000000000000;
     const POW32: felt252 = 0x100000000;
     const POW32_TYPED: ConstValue<POW32> = 0x100000000;
+    const NZ_POW32_TYPED: NonZero<ConstValue<POW32>> = 0x100000000;
 
     impl DivRemU128By96 of DivRemHelper<u128, ConstValue<POW96>> {
         type DivT = BoundedInt<0, { POW32 - 1 }>;
@@ -470,26 +457,88 @@ mod conversions {
         type RemT = BoundedInt<0, { POW64 - 1 }>;
     }
 
-    impl MulHelperImpl of MulHelper<BoundedInt<0, { POW64 - 1 }>, ConstValue<POW32>> {
+    impl DivRemU96By32 of DivRemHelper<u96, ConstValue<POW32>> {
+        type DivT = BoundedInt<0, { POW64 - 1 }>;
+        type RemT = BoundedInt<0, { POW32 - 1 }>;
+    }
+
+    impl DivRemU96By64 of DivRemHelper<u96, ConstValue<POW64>> {
+        type DivT = BoundedInt<0, { POW32 - 1 }>;
+        type RemT = BoundedInt<0, { POW64 - 1 }>;
+    }
+
+    impl MulHelper64By32Impl of MulHelper<BoundedInt<0, { POW64 - 1 }>, ConstValue<POW32>> {
         type Result = BoundedInt<0, { POW96 - POW32 }>;
     }
 
-    impl AddHelperImpl of AddHelper<
+    impl MulHelper32By96Impl of MulHelper<BoundedInt<0, { POW32 - 1 }>, ConstValue<POW96>> {
+        type Result = BoundedInt<0, { POW128 - POW96 }>;
+    }
+
+    impl MulHelper64By64Impl of MulHelper<BoundedInt<0, { POW64 - 1 }>, ConstValue<POW64>> {
+        type Result = BoundedInt<0, { POW128 - POW64 }>;
+    }
+
+    impl AddHelperTo96By32Impl of AddHelper<
         BoundedInt<0, { POW96 - POW32 }>, BoundedInt<0, { POW32 - 1 }>
     > {
-        type Result = BoundedInt<0, { POW96 - 1 }>;
+        type Result = u96;
     }
 
-    pub fn from_u128(value: u128) -> super::u384 {
-        let (limb1, limb0) = bounded_int_div_rem(value, NZ_POW96_TYPED);
-        core::circuit::u384 { limb0, limb1: core::integer::upcast(limb1), limb2: 0, limb3: 0 }
+    impl AddHelperTo128By64Impl of AddHelper<
+        BoundedInt<0, { POW128 - POW64 }>, BoundedInt<0, { POW64 - 1 }>
+    > {
+        type Result = BoundedInt<0, { POW128 - 1 }>;
     }
 
-    pub fn from_u256(value: u256) -> super::u384 {
-        let (limb1_low32, limb0) = bounded_int_div_rem(value.low, NZ_POW96_TYPED);
-        let (limb2, limb1_high64) = bounded_int_div_rem(value.high, NZ_POW64_TYPED);
-        let limb1 = bounded_int_add(bounded_int_mul(limb1_high64, POW32_TYPED), limb1_low32);
-        core::circuit::u384 { limb0, limb1, limb2: core::integer::upcast(limb2), limb3: 0 }
+    impl AddHelperTo128By96Impl of AddHelper<BoundedInt<0, { POW128 - POW96 }>, u96> {
+        type Result = BoundedInt<0, { POW128 - 1 }>;
+    }
+
+    pub fn from_u128(value: u128) -> u384 {
+        let (limb1, limb0) = bounded_int::div_rem(value, NZ_POW96_TYPED);
+        u384 { limb0, limb1: upcast(limb1), limb2: 0, limb3: 0 }
+    }
+
+    pub fn from_u256(value: u256) -> u384 {
+        let (limb1_low32, limb0) = bounded_int::div_rem(value.low, NZ_POW96_TYPED);
+        let (limb2, limb1_high64) = bounded_int::div_rem(value.high, NZ_POW64_TYPED);
+        let limb1 = bounded_int::add(bounded_int::mul(limb1_high64, POW32_TYPED), limb1_low32);
+        u384 { limb0, limb1, limb2: upcast(limb2), limb3: 0 }
+    }
+
+    pub fn try_into_u128(value: u384) -> Option<u128> {
+        if value.limb2 != 0 || value.limb3 != 0 {
+            return Option::None;
+        }
+        let (limb1_high, limb1_low) = bounded_int::div_rem(value.limb1, NZ_POW32_TYPED);
+        if limb1_high != 0 {
+            return Option::None;
+        }
+        Option::Some(
+            upcast(bounded_int::add(bounded_int::mul(limb1_low, POW96_TYPED), value.limb0))
+        )
+    }
+
+    pub fn try_into_u256(value: u384) -> Option<u256> {
+        if value.limb3 != 0 {
+            return Option::None;
+        }
+        let (limb2_high, limb2_low) = bounded_int::div_rem(value.limb2, NZ_POW64_TYPED);
+        if limb2_high != 0 {
+            return Option::None;
+        }
+        let (limb1_high, limb1_low) = bounded_int::div_rem(value.limb1, NZ_POW32_TYPED);
+        Option::Some(
+            u256 {
+                high: upcast(
+                    bounded_int::add(bounded_int::mul(limb2_low, POW64_TYPED), limb1_high)
+                ),
+                low: upcast(
+                    bounded_int::add(bounded_int::mul(limb1_low, POW96_TYPED), value.limb0)
+                ),
+            }
+        )
     }
 }
 
@@ -508,5 +557,31 @@ impl U256IntoU384 of Into<u256, u384> {
 impl Felt252IntoU384 of Into<felt252, u384> {
     fn into(self: felt252) -> u384 {
         conversions::from_u256(self.into())
+    }
+}
+
+impl U384TryIntoU128 of TryInto<u384, u128> {
+    fn try_into(self: u384) -> Option<u128> {
+        conversions::try_into_u128(self)
+    }
+}
+
+impl U384TryIntoU256 of TryInto<u384, u256> {
+    fn try_into(self: u384) -> Option<u256> {
+        conversions::try_into_u256(self)
+    }
+}
+
+impl U384Zero of crate::num::traits::Zero<u384> {
+    fn zero() -> u384 {
+        u384 { limb0: 0, limb1: 0, limb2: 0, limb3: 0 }
+    }
+
+    fn is_zero(self: @u384) -> bool {
+        *self == Self::zero()
+    }
+
+    fn is_non_zero(self: @u384) -> bool {
+        !self.is_zero()
     }
 }
