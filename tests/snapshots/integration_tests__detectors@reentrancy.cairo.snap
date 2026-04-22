@@ -41,10 +41,4 @@ input_file: tests/detectors/reentrancy.cairo
         confidence: Medium,
         message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__bad5\n\tExternal call call_contract_syscall([31], [32], [15], [39], [42]) { fallthrough([43], [44], [45]) 894([46], [47], [48]) } done in reentrancy::reentrancy::TestContract::__wrapper__bad5\n\tVariable written after storage_write_syscall([43], [44], [29], [50], [51]) { fallthrough([52], [53]) 885([54], [55], [56]) } in reentrancy::reentrancy::TestContract::__wrapper__bad5.",
     },
-    Result {
-        impact: Medium,
-        name: "reentrancy",
-        confidence: Medium,
-        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__good2\n\tExternal call call_contract_syscall([31], [32], [15], [39], [42]) { fallthrough([43], [44], [45]) 215([46], [47], [48]) } done in reentrancy::reentrancy::TestContract::__wrapper__good2\n\tVariable written after storage_write_syscall([43], [44], [29], [50], [51]) { fallthrough([52], [53]) 206([54], [55], [56]) } in reentrancy::reentrancy::TestContract::__wrapper__good2.",
-    },
 ]
