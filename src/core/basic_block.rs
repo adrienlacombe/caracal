@@ -3,6 +3,7 @@ use crate::core::function::{Function, Type};
 use std::hash::{Hash, Hasher};
 
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreLibfunc, CoreType};
+use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::program::GenStatement;
 use cairo_lang_sierra::program_registry::ProgramRegistry;
 
@@ -207,6 +208,30 @@ impl BasicBlock {
                             }
                             break;
                         }
+                    }
+                }
+
+                // Since cairo 2.11+ the storage helpers, dispatcher impls, and
+                // event emitters are inlined away — the effects show up as raw
+                // Starknet syscalls rather than FunctionCall invocations.
+                if let CoreConcreteLibfunc::Starknet(sn) = lib_func {
+                    match sn {
+                        StarknetConcreteLibfunc::StorageRead(_) => {
+                            self.storage_variable_read = Some(instruction.clone());
+                        }
+                        StarknetConcreteLibfunc::StorageWrite(_) => {
+                            self.storage_variable_written = Some(instruction.clone());
+                        }
+                        StarknetConcreteLibfunc::CallContract(_) => {
+                            self.external_call = Some(instruction.clone());
+                        }
+                        StarknetConcreteLibfunc::LibraryCall(_) => {
+                            self.library_call = Some(instruction.clone());
+                        }
+                        StarknetConcreteLibfunc::EmitEvent(_) => {
+                            self.event_emitted = Some(instruction.clone());
+                        }
+                        _ => {}
                     }
                 }
             }

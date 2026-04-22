@@ -41,7 +41,7 @@ impl Detector for ReentrancyEvents {
                             for call in reentrancy_info.external_calls.iter() {
                                 let external_function_call = format!(
                                     "{}",
-                                    call.get_external_call().as_ref().unwrap().get_statement()
+                                    call.get_function_call().unwrap().get_statement()
                                 );
 
                                 if let Some(safe_external_calls) = core.get_safe_external_calls() {

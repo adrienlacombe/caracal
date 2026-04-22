@@ -4,4 +4,17 @@ assertion_line: 23
 expression: results
 input_file: tests/detectors/reentrancy_events.cairo
 ---
-[]
+[
+    Result {
+        impact: Low,
+        name: "reentrancy-events",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy_events::reentrancy_events::TestContract::__wrapper__bad1\n\tExternal call call_contract_syscall([5], [2], [15], [25], [28]) { fallthrough([29], [30], [31]) 301([32], [33], [34]) } done in reentrancy_events::reentrancy_events::TestContract::__wrapper__bad1\n\tEvent emitted after emit_event_syscall([29], [30], [43], [44]) { fallthrough([45], [46]) 292([47], [48], [49]) } in reentrancy_events::reentrancy_events::TestContract::__wrapper__bad1.",
+    },
+    Result {
+        impact: Low,
+        name: "reentrancy-events",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy_events::reentrancy_events::TestContract::__wrapper__good2\n\tExternal call call_contract_syscall([5], [2], [15], [25], [28]) { fallthrough([29], [30], [31]) 189([32], [33], [34]) } done in reentrancy_events::reentrancy_events::TestContract::__wrapper__good2\n\tEvent emitted after emit_event_syscall([29], [30], [43], [44]) { fallthrough([45], [46]) 180([47], [48], [49]) } in reentrancy_events::reentrancy_events::TestContract::__wrapper__good2.",
+    },
+]

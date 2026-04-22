@@ -40,7 +40,7 @@ impl Detector for Reentrancy {
                         for call in reentrancy_info.external_calls.iter() {
                             let external_function_call = format!(
                                 "{}",
-                                call.get_external_call().as_ref().unwrap().get_statement()
+                                call.get_function_call().unwrap().get_statement()
                             );
 
                             if let Some(safe_external_calls) = core.get_safe_external_calls() {
@@ -67,9 +67,8 @@ impl Detector for Reentrancy {
                                             .get_statement()
                                             .to_string()
                                             .rsplit_once("::")
-                                            .unwrap()
-                                            .0
-                                            .to_string()
+                                            .map(|(p, _)| p.to_string())
+                                            .unwrap_or_default()
                                     })
                                     .collect();
                                 for written_variable in
@@ -82,9 +81,8 @@ impl Detector for Reentrancy {
                                         .get_statement()
                                         .to_string()
                                         .rsplit_once("::")
-                                        .unwrap()
-                                        .0
-                                        .to_string();
+                                        .map(|(p, _)| p.to_string())
+                                        .unwrap_or_default();
                                     if vars_read.contains(&written_variable_name) {
                                         results.insert(Result {
                                             name: self.name().to_string(),

@@ -4,6 +4,7 @@ use crate::core::function::Function;
 use crate::core::{basic_block::BasicBlock, function::Type, instruction::Instruction};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::core::{CoreLibfunc, CoreType};
+use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::program::GenStatement;
 use cairo_lang_sierra::program_registry::ProgramRegistry;
 use std::collections::{HashMap, HashSet};
@@ -121,6 +122,39 @@ impl ReentrancyAnalysis {
                     let lib_func = registry
                         .get_libfunc(&invoc.libfunc_id)
                         .expect("Library function not found in the registry");
+                    // Since cairo 2.11+ the storage helpers, dispatcher impls
+                    // and event emitters are inlined away, so the effects show
+                    // up as raw Starknet syscalls rather than FunctionCall
+                    // statements. Recognise them directly.
+                    if let CoreConcreteLibfunc::Starknet(sn) = lib_func {
+                        match sn {
+                            StarknetConcreteLibfunc::StorageRead(_) => {
+                                inner_state
+                                    .storage_variables_read
+                                    .insert(basic_block.clone());
+                            }
+                            StarknetConcreteLibfunc::StorageWrite(_) => {
+                                inner_state
+                                    .storage_variables_written
+                                    .insert(basic_block.clone());
+                            }
+                            StarknetConcreteLibfunc::CallContract(_)
+                            | StarknetConcreteLibfunc::LibraryCall(_) => {
+                                inner_state.external_calls.insert(basic_block.clone());
+                                inner_state.variables_read_before_calls.insert(
+                                    basic_block.clone(),
+                                    HashSet::from_iter(
+                                        inner_state.storage_variables_read.clone(),
+                                    ),
+                                );
+                            }
+                            StarknetConcreteLibfunc::EmitEvent(_) => {
+                                inner_state.events.insert(basic_block.clone());
+                            }
+                            _ => {}
+                        }
+                        return;
+                    }
                     if let CoreConcreteLibfunc::FunctionCall(f_called) = lib_func {
                         // We search for the function called in our list of functions to know its type
                         for function in functions {

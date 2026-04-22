@@ -4,4 +4,47 @@ assertion_line: 23
 expression: results
 input_file: tests/detectors/reentrancy.cairo
 ---
-[]
+[
+    Result {
+        impact: Medium,
+        name: "reentrancy",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__bad1\n\tExternal call call_contract_syscall([31], [32], [15], [39], [42]) { fallthrough([43], [44], [45]) 346([46], [47], [48]) } done in reentrancy::reentrancy::TestContract::__wrapper__bad1\n\tVariable written after storage_write_syscall([43], [44], [29], [50], [51]) { fallthrough([52], [53]) 337([54], [55], [56]) } in reentrancy::reentrancy::TestContract::__wrapper__bad1.",
+    },
+    Result {
+        impact: Medium,
+        name: "reentrancy",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__bad2\n\tExternal call call_contract_syscall([31], [32], [15], [39], [42]) { fallthrough([43], [44], [45]) 497([46], [47], [48]) } done in reentrancy::reentrancy::TestContract::__wrapper__bad2\n\tVariable written after storage_write_syscall([43], [44], [52], [50], [51]) { fallthrough([53], [54]) 487([55], [56], [57]) } in reentrancy::reentrancy::TestContract::__wrapper__bad2.",
+    },
+    Result {
+        impact: Medium,
+        name: "reentrancy",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__bad2\n\tExternal call call_contract_syscall([31], [32], [15], [39], [42]) { fallthrough([43], [44], [45]) 497([46], [47], [48]) } done in reentrancy::reentrancy::TestContract::__wrapper__bad2\n\tVariable written after storage_write_syscall([53], [54], [29], [59], [60]) { fallthrough([61], [62]) 478([63], [64], [65]) } in reentrancy::reentrancy::TestContract::__wrapper__bad2.",
+    },
+    Result {
+        impact: Medium,
+        name: "reentrancy",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__bad3\n\tExternal call call_contract_syscall([31], [32], [15], [40], [43]) { fallthrough([44], [45], [46]) 630([47], [48], [49]) } done in reentrancy::reentrancy::TestContract::__wrapper__bad3\n\tVariable written after storage_write_syscall([44], [45], [29], [51], [52]) { fallthrough([53], [54]) 621([55], [56], [57]) } in reentrancy::reentrancy::TestContract::__wrapper__bad3.",
+    },
+    Result {
+        impact: Medium,
+        name: "reentrancy",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__bad4\n\tExternal call call_contract_syscall([31], [32], [15], [40], [43]) { fallthrough([44], [45], [46]) 763([47], [48], [49]) } done in reentrancy::reentrancy::TestContract::__wrapper__bad4\n\tVariable written after storage_write_syscall([44], [45], [29], [51], [52]) { fallthrough([53], [54]) 754([55], [56], [57]) } in reentrancy::reentrancy::TestContract::__wrapper__bad4.",
+    },
+    Result {
+        impact: Medium,
+        name: "reentrancy",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__bad5\n\tExternal call call_contract_syscall([31], [32], [15], [39], [42]) { fallthrough([43], [44], [45]) 894([46], [47], [48]) } done in reentrancy::reentrancy::TestContract::__wrapper__bad5\n\tVariable written after storage_write_syscall([43], [44], [29], [50], [51]) { fallthrough([52], [53]) 885([54], [55], [56]) } in reentrancy::reentrancy::TestContract::__wrapper__bad5.",
+    },
+    Result {
+        impact: Medium,
+        name: "reentrancy",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy::reentrancy::TestContract::__wrapper__good2\n\tExternal call call_contract_syscall([31], [32], [15], [39], [42]) { fallthrough([43], [44], [45]) 215([46], [47], [48]) } done in reentrancy::reentrancy::TestContract::__wrapper__good2\n\tVariable written after storage_write_syscall([43], [44], [29], [50], [51]) { fallthrough([52], [53]) 206([54], [55], [56]) } in reentrancy::reentrancy::TestContract::__wrapper__good2.",
+    },
+]

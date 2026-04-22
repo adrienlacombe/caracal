@@ -42,9 +42,8 @@ impl Detector for ReadOnlyReentrancy {
                     let var_read = storage_var_read
                         .to_string()
                         .rsplit_once("::")
-                        .unwrap()
-                        .0
-                        .to_string();
+                        .map(|(p, _)| p.to_string())
+                        .unwrap_or_default();
                     let functions_name = vars_read.entry(var_read).or_default();
                     functions_name.insert(f.name());
                 }
@@ -60,7 +59,7 @@ impl Detector for ReadOnlyReentrancy {
                         for call in reentrancy_info.external_calls.iter() {
                             let external_function_call = format!(
                                 "{}",
-                                call.get_external_call().as_ref().unwrap().get_statement()
+                                call.get_function_call().unwrap().get_statement()
                             );
 
                             if let Some(safe_external_calls) = core.get_safe_external_calls() {
@@ -81,9 +80,8 @@ impl Detector for ReadOnlyReentrancy {
                                     .get_statement()
                                     .to_string()
                                     .rsplit_once("::")
-                                    .unwrap()
-                                    .0
-                                    .to_string();
+                                    .map(|(p, _)| p.to_string())
+                                    .unwrap_or_default();
 
                                 if vars_read.contains_key(&written_variable_name) {
                                     for view_function in
