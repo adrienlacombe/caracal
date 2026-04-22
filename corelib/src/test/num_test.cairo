@@ -1,7 +1,7 @@
 use crate::num::traits::BitSize;
 use crate::num::traits::{
     OverflowingAdd, OverflowingSub, OverflowingMul, WrappingAdd, WrappingSub, WrappingMul,
-    CheckedAdd, CheckedSub, CheckedMul, SaturatingAdd, SaturatingSub, SaturatingMul
+    CheckedAdd, CheckedSub, CheckedMul, SaturatingAdd, SaturatingSub, SaturatingMul, Pow,
 };
 use crate::num::traits::Bounded;
 
@@ -369,6 +369,20 @@ fn test_saturating_add_signed_integers() {
 }
 
 #[test]
+fn test_saturating_add_signed_negative_integers() {
+    assert_eq!(Bounded::<i8>::MIN.saturating_add(-1), Bounded::<i8>::MIN);
+    assert_eq!((-1_i8).saturating_add(-2), -3);
+    assert_eq!(Bounded::<i16>::MIN.saturating_add(-1), Bounded::<i16>::MIN);
+    assert_eq!((-1_i16).saturating_add(-2), -3);
+    assert_eq!(Bounded::<i32>::MIN.saturating_add(-1), Bounded::<i32>::MIN);
+    assert_eq!((-1_i32).saturating_add(-2), -3);
+    assert_eq!(Bounded::<i64>::MIN.saturating_add(-1), Bounded::<i64>::MIN);
+    assert_eq!((-1_i64).saturating_add(-2), -3);
+    assert_eq!(Bounded::<i128>::MIN.saturating_add(-1), Bounded::<i128>::MIN);
+    assert_eq!((-1_i128).saturating_add(-2), -3);
+}
+
+#[test]
 fn test_saturating_sub_unsigned_integers() {
     assert_eq!(3_u8.saturating_sub(2), 1);
     assert_eq!(0_u8.saturating_sub(1), 0);
@@ -399,6 +413,20 @@ fn test_saturating_sub_signed_integers() {
 }
 
 #[test]
+fn test_saturating_sub_signed_negative_integers() {
+    assert_eq!(1_i8.saturating_sub(-2), 3);
+    assert_eq!(Bounded::<i8>::MAX.saturating_sub(-1), Bounded::<i8>::MAX);
+    assert_eq!(1_i16.saturating_sub(-2), 3);
+    assert_eq!(Bounded::<i16>::MAX.saturating_sub(-1), Bounded::<i16>::MAX);
+    assert_eq!(1_i32.saturating_sub(-2), 3);
+    assert_eq!(Bounded::<i32>::MAX.saturating_sub(-1), Bounded::<i32>::MAX);
+    assert_eq!(1_i64.saturating_sub(-2), 3);
+    assert_eq!(Bounded::<i64>::MAX.saturating_sub(-1), Bounded::<i64>::MAX);
+    assert_eq!(1_i128.saturating_sub(-2), 3);
+    assert_eq!(Bounded::<i128>::MAX.saturating_sub(-1), Bounded::<i128>::MAX);
+}
+
+#[test]
 fn test_saturating_mul_unsigned_integers() {
     assert_eq!(2_u8.saturating_mul(3), 6);
     assert_eq!(Bounded::<u8>::MAX.saturating_mul(2), Bounded::<u8>::MAX);
@@ -412,4 +440,31 @@ fn test_saturating_mul_unsigned_integers() {
     assert_eq!(Bounded::<u128>::MAX.saturating_mul(2), Bounded::<u128>::MAX);
     assert_eq!(2_u256.saturating_mul(3), 6);
     assert_eq!(Bounded::<u256>::MAX.saturating_mul(2), Bounded::<u256>::MAX);
+}
+
+#[test]
+fn test_pow() {
+    assert_eq!((-2_i8).pow(0), 1);
+    assert_eq!((-2_i8).pow(1), -2);
+    assert_eq!((-2_i8).pow(2), 4);
+    assert_eq!((-2_i8).pow(3), -8);
+    assert_eq!((-2_i8).pow(4), 16);
+    assert_eq!((-2_i8).pow(5), -32);
+    assert_eq!((-2_i8).pow(6), 64);
+
+    assert_eq!(0.pow(0), 1);
+    assert_eq!(0.pow(1), 0);
+    assert_eq!(0.pow(2), 0);
+
+    assert_eq!(2.pow(0), 0b1);
+    assert_eq!(2.pow(1), 0b10);
+    assert_eq!(2.pow(2), 0b100);
+    assert_eq!(2.pow(3), 0b1000);
+    assert_eq!(2.pow(4), 0b10000);
+    assert_eq!(2.pow(5), 0b100000);
+    assert_eq!(2.pow(6), 0b1000000);
+    assert_eq!(2.pow(7), 0b10000000);
+    assert_eq!(2.pow(8), 0b100000000);
+    assert_eq!(2.pow(9), 0b1000000000);
+    assert_eq!(2.pow(10), 0b10000000000);
 }

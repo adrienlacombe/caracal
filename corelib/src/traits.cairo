@@ -11,7 +11,7 @@ pub trait Add<T> {
     fn add(lhs: T, rhs: T) -> T;
 }
 #[deprecated(
-    feature: "deprecated-op-assign-traits", note: "Use `core::ops::AddAssign`.", since: "2.7.0"
+    feature: "deprecated-op-assign-traits", note: "Use `core::ops::AddAssign`.", since: "2.7.0",
 )]
 pub trait AddEq<T> {
     fn add_eq(ref self: T, other: T);
@@ -22,7 +22,7 @@ pub trait Sub<T> {
     fn sub(lhs: T, rhs: T) -> T;
 }
 #[deprecated(
-    feature: "deprecated-op-assign-traits", note: "Use `core::ops::SubAssign`.", since: "2.7.0"
+    feature: "deprecated-op-assign-traits", note: "Use `core::ops::SubAssign`.", since: "2.7.0",
 )]
 pub trait SubEq<T> {
     fn sub_eq(ref self: T, other: T);
@@ -33,7 +33,7 @@ pub trait Mul<T> {
     fn mul(lhs: T, rhs: T) -> T;
 }
 #[deprecated(
-    feature: "deprecated-op-assign-traits", note: "Use `core::ops::MulAssign`.", since: "2.7.0"
+    feature: "deprecated-op-assign-traits", note: "Use `core::ops::MulAssign`.", since: "2.7.0",
 )]
 pub trait MulEq<T> {
     fn mul_eq(ref self: T, other: T);
@@ -44,7 +44,7 @@ pub trait Div<T> {
     fn div(lhs: T, rhs: T) -> T;
 }
 #[deprecated(
-    feature: "deprecated-op-assign-traits", note: "Use `core::ops::DivAssign`.", since: "2.7.0"
+    feature: "deprecated-op-assign-traits", note: "Use `core::ops::DivAssign`.", since: "2.7.0",
 )]
 pub trait DivEq<T> {
     fn div_eq(ref self: T, other: T);
@@ -55,7 +55,7 @@ pub trait Rem<T> {
     fn rem(lhs: T, rhs: T) -> T;
 }
 #[deprecated(
-    feature: "deprecated-op-assign-traits", note: "Use `core::ops::RemAssign`.", since: "2.7.0"
+    feature: "deprecated-op-assign-traits", note: "Use `core::ops::RemAssign`.", since: "2.7.0",
 )]
 pub trait RemEq<T> {
     fn rem_eq(ref self: T, other: T);
@@ -161,14 +161,14 @@ pub trait Not<T> {
 /// for each type. Both are not consuming of self, the first gets a snapshot of the object and
 /// the second gets ref.
 #[deprecated(
-    feature: "deprecated-index-traits", note: "Use `core::ops::index::IndexView`.", since: "2.7.0"
+    feature: "deprecated-index-traits", note: "Use `core::ops::index::IndexView`.", since: "2.7.0",
 )]
 pub trait IndexView<C, I, V> {
     fn index(self: @C, index: I) -> V;
 }
 
 #[deprecated(
-    feature: "deprecated-index-traits", note: "Use `core::ops::index::Index`.", since: "2.7.0"
+    feature: "deprecated-index-traits", note: "Use `core::ops::index::Index`.", since: "2.7.0",
 )]
 pub trait Index<C, I, V> {
     fn index(ref self: C, index: I) -> V;
@@ -179,7 +179,7 @@ pub trait Destruct<T> {
 }
 // TODO(spapini): Remove this, it can lead to multiple impls and unwanted Destruct implementation.
 impl DestructFromDrop<T, +Drop<T>> of Destruct<T> {
-    #[inline(always)]
+    #[inline]
     fn destruct(self: T) nopanic {}
 }
 
@@ -187,7 +187,7 @@ pub trait PanicDestruct<T> {
     fn panic_destruct(self: T, ref panic: Panic) nopanic;
 }
 pub(crate) impl PanicDestructForDestruct<T, +Destruct<T>> of PanicDestruct<T> {
-    #[inline(always)]
+    #[inline]
     fn panic_destruct(self: T, ref panic: Panic) nopanic {
         Destruct::destruct(self);
     }
@@ -199,7 +199,7 @@ pub trait Default<T> {
 }
 
 impl SnapshotDefault<T, +Default<T>, +Drop<T>> of Default<@T> {
-    #[inline(always)]
+    #[inline]
     fn default() -> @T {
         @Default::default()
     }
@@ -221,14 +221,14 @@ impl TupleNextDrop<
     impl TH: crate::metaprogramming::TupleSplit<T>,
     +crate::metaprogramming::IsTuple<T>,
     +Drop<TH::Head>,
-    +Drop<TH::Rest>
+    +Drop<TH::Rest>,
 > of Drop<T>;
 impl TupleNextCopy<
     T,
     impl TH: crate::metaprogramming::TupleSplit<T>,
     +crate::metaprogramming::IsTuple<T>,
     +Copy<TH::Head>,
-    +Copy<TH::Rest>
+    +Copy<TH::Rest>,
 > of Copy<T>;
 
 /// Tuple `PartialEq` implementation.
