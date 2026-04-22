@@ -64,15 +64,18 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         .build()?;
     init_dev_corelib(&mut db, corelib);
 
+    let main_crate_ids = setup_project(&mut db, &opts.target)?;
+
     let compiler_config = CompilerConfig {
         replace_ids: true,
         // Don't fail compilation on cairo deprecation warnings emitted by the
-        // fixture contracts (e.g. `starknet::class_hash_const`).
-        diagnostics_reporter: DiagnosticsReporter::stderr().allow_warnings(),
+        // fixture contracts, and only report diagnostics originating in the
+        // user's main crates (not the corelib/starknet dispatcher plugins).
+        diagnostics_reporter: DiagnosticsReporter::stderr()
+            .allow_warnings()
+            .with_crates(&main_crate_ids),
         ..Default::default()
     };
-
-    let main_crate_ids = setup_project(&mut db, &opts.target)?;
 
     let contracts = find_contracts(&db, &main_crate_ids);
     if contracts.is_empty() {

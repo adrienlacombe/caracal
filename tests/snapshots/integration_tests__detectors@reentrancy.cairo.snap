@@ -9,12 +9,6 @@ input_file: tests/detectors/reentrancy.cairo
         impact: Low,
         name: "use-after-pop-front",
         confidence: Medium,
-        message: "The span [9] is used after removing elements from it in the function reentrancy::reentrancy::TestContract::__wrapper__bad2",
-    },
-    Result {
-        impact: Low,
-        name: "use-after-pop-front",
-        confidence: Medium,
-        message: "The span [9] is used after removing elements from it in the function reentrancy::reentrancy::TestContract::__wrapper__bad4",
+        message: "The span [8] is used after removing elements from it in the function reentrancy::reentrancy::TestContract::__wrapper__bad2",
     },
 ]

@@ -6,7 +6,7 @@
 //!
 //! System calls enable a contract to require services from the Starknet OS. You can use system
 //! calls in a function to get information that depends on the broader state of Starknet, such as
-//! the current timestamp of the address of the caller, but also to modify the state of Starknet by,
+//! the current timestamp or the address of the caller, but also to modify the state of Starknet by,
 //! for example, storing values in a contract's storage or deploying new contracts.
 
 use core::gas::GasBuiltin;
@@ -70,10 +70,10 @@ pub extern fn get_block_hash_syscall(
     block_number: u64,
 ) -> SyscallResult<felt252> implicits(GasBuiltin, System) nopanic;
 
-/// Gets information about the currently executing block and the transactions in the block. For a
-/// complete description of this information, see [`Execution information`].
-///
+/// Gets information about the currently executing block and the transactions within it.
+/// For a complete description of this information, see [`Execution information`].
 /// When an account’s `__validate__`, `__validate_deploy__`, or `__validate_declare__` function
+///
 /// calls `get_execution_info`, the return values for `block_timestamp` and `block_number` are
 /// modified as follows:
 /// * `block_timestamp` returns the hour, rounded down to the nearest hour.
@@ -223,7 +223,7 @@ pub extern fn sha256_process_block_syscall(
 ///
 /// NOTE: This syscall should only be used to allow support for old version-0 bound accounts,
 /// and should not be used for other purposes.
-extern fn meta_tx_v0_syscall(
+pub extern fn meta_tx_v0_syscall(
     address: ContractAddress,
     entry_point_selector: felt252,
     calldata: Span<felt252>,

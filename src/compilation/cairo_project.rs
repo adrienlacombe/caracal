@@ -56,13 +56,15 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         .build()?;
     init_dev_corelib(&mut db, corelib);
 
+    let main_crate_ids = setup_project(&mut db, &opts.target)?;
+
     let compiler_config = CompilerConfig {
         replace_ids: true,
-        diagnostics_reporter: DiagnosticsReporter::stderr().allow_warnings(),
+        diagnostics_reporter: DiagnosticsReporter::stderr()
+            .allow_warnings()
+            .with_crates(&main_crate_ids),
         ..Default::default()
     };
-
-    let main_crate_ids = setup_project(&mut db, &opts.target)?;
 
     let contracts = find_contracts(&db, &main_crate_ids);
     if contracts.is_empty() {

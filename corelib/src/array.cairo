@@ -404,7 +404,7 @@ impl SpanFelt252Serde of Serde<Span<felt252>> {
     /// ```
     /// let span: Span<felt252> = array![1, 2, 3].span();
     /// let mut output: Array<felt252> = array![];
-    /// arr.serialize(ref output);
+    /// span.serialize(ref output);
     /// assert!(output == array![3, 1, 2, 3].span());
     /// ```
     fn serialize(self: @Span<felt252>, ref output: Array<felt252>) {
@@ -438,7 +438,7 @@ impl SpanSerde<T, +Serde<T>, +Drop<T>, -TypeEqual<felt252, T>> of Serde<Span<T>>
     /// ```
     /// let span: Span<u8> = array![1, 2, 3].span();
     /// let mut output: Array<felt252> = array![];
-    /// arr.serialize(ref output);
+    /// span.serialize(ref output);
     /// assert!(output == array![3, 1, 2, 3].span());
     /// ```
     fn serialize(self: @Span<T>, ref output: Array<felt252>) {
@@ -475,7 +475,7 @@ pub impl SpanImpl<T> of SpanTrait<T> {
     /// assert!(span.pop_front() == Some(@1));
     /// ```
     #[inline]
-    fn pop_front(ref self: Span<T>) -> Option<@T> {
+    fn pop_front(ref self: Span<T>) -> Option<@T> nopanic {
         let mut snapshot = self.snapshot;
         let item = array_snapshot_pop_front(ref snapshot);
         self = Span { snapshot };

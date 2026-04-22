@@ -9,6 +9,6 @@ input_file: tests/detectors/unused_events.cairo
         impact: Low,
         name: "use-after-pop-front",
         confidence: Medium,
-        message: "The spans [9, 16] are used after removing elements from them in the function unused_events::unused_events::UnusedEvents::__wrapper__use_event1",
+        message: "The spans [8, 9] are used after removing elements from them in the function unused_events::unused_events::UnusedEvents::__wrapper__use_event1",
     },
 ]
