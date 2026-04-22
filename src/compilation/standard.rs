@@ -3,15 +3,15 @@ use std::env;
 use std::process;
 
 use cairo_lang_compiler::db::RootDatabase;
-use cairo_lang_compiler::project::{setup_project, ProjectConfig, ProjectConfigContent};
+use cairo_lang_compiler::project::setup_project;
 use cairo_lang_compiler::CompilerConfig;
-use cairo_lang_filesystem::ids::Directory;
+use cairo_lang_filesystem::db::init_dev_corelib;
 use cairo_lang_sierra_generator::replace_ids::SierraIdReplacer;
-use cairo_lang_starknet::compiler_version::current_compiler_version_id;
+use cairo_lang_starknet::compile::compile_prepared_db;
 use cairo_lang_starknet::contract::find_contracts;
-use cairo_lang_starknet::contract_class::{compile_prepared_db, ContractClass};
 use cairo_lang_starknet::starknet_plugin_suite;
-use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
+use cairo_lang_starknet_classes::compiler_version::current_compiler_version_id;
+use cairo_lang_starknet_classes::contract_class::ContractClass;
 
 use super::ProgramCompiled;
 use crate::compilation::utils::felt252_serde::sierra_from_felt252s;
@@ -58,20 +58,10 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         }
     };
 
-    // Needed to pass the correct corelib path
-    let project_config = ProjectConfig {
-        corelib: Some(Directory::Real(corelib)),
-        base_path: "".into(),
-        content: ProjectConfigContent {
-            crate_roots: OrderedHashMap::default(),
-            crates_config: Default::default(),
-        },
-    };
-
     let mut db = RootDatabase::builder()
-        .with_project_config(project_config)
         .with_plugin_suite(starknet_plugin_suite())
         .build()?;
+    init_dev_corelib(&mut db, corelib);
 
     let compiler_config = CompilerConfig {
         replace_ids: true,

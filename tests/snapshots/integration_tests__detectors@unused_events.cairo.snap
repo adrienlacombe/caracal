@@ -1,12 +1,14 @@
 ---
 source: tests/integration_tests.rs
+assertion_line: 23
 expression: results
+input_file: tests/detectors/unused_events.cairo
 ---
 [
     Result {
-        impact: Medium,
-        name: "unused-events",
+        impact: Low,
+        name: "use-after-pop-front",
         confidence: Medium,
-        message: "Event MyUnusedEvent defined in unused_events::unused_events::UnusedEvents is never emitted",
+        message: "The spans [8, 13] are used after removing elements from them in the function unused_events::unused_events::UnusedEvents::__wrapper__use_event1",
     },
 ]

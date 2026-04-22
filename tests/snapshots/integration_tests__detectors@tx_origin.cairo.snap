@@ -1,19 +1,32 @@
 ---
 source: tests/integration_tests.rs
+assertion_line: 23
 expression: results
 input_file: tests/detectors/tx_origin.cairo
 ---
 [
     Result {
         impact: Medium,
-        name: "tx-origin",
+        name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The transaction origin contract address is used in an access control check in the function tx_origin::tx_origin::TxOrigin::bad",
+        message: "The function tx_origin::tx_origin::TxOrigin::__wrapper__bad uses the felt252 operation felt252_sub([50], [51]) -> ([52]), which is not overflow/underflow safe",
+    },
+    Result {
+        impact: Medium,
+        name: "felt252-unsafe-arithmetic",
+        confidence: Medium,
+        message: "The function tx_origin::tx_origin::TxOrigin::__wrapper__bad_indirect uses the felt252 operation felt252_sub([50], [51]) -> ([52]), which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
         name: "tx-origin",
         confidence: Medium,
-        message: "The transaction origin contract address is used in an access control check in the function tx_origin::tx_origin::TxOrigin::bad_indirect",
+        message: "The transaction origin contract address is used in an access control check in the function tx_origin::tx_origin::TxOrigin::__wrapper__bad",
+    },
+    Result {
+        impact: Medium,
+        name: "tx-origin",
+        confidence: Medium,
+        message: "The transaction origin contract address is used in an access control check in the function tx_origin::tx_origin::TxOrigin::__wrapper__bad_indirect",
     },
 ]

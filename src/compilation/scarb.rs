@@ -8,7 +8,7 @@ use crate::compilation::utils::replacer::SierraProgramDebugReplacer;
 use crate::compilation::ProgramCompiled;
 use crate::core::core_unit::CoreOpts;
 use cairo_lang_sierra_generator::replace_ids::SierraIdReplacer;
-use cairo_lang_starknet::contract_class::ContractClass;
+use cairo_lang_starknet_classes::contract_class::ContractClass;
 
 pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     process::Command::new("scarb")

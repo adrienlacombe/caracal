@@ -9,6 +9,8 @@ use core::array::SpanTrait;
 pub trait NumericLiteral<T>;
 impl NumericLiteralfelt252 of NumericLiteral<felt252>;
 
+impl NumericLiteralNonZero<T, +NumericLiteral<T>> of NumericLiteral<NonZero<T>>;
+
 #[derive(Copy, Drop)]
 pub extern type u128;
 impl NumericLiteralu128 of NumericLiteral<u128>;
@@ -31,14 +33,14 @@ fn u128_try_from_felt252(a: felt252) -> Option<u128> implicits(RangeCheck) nopan
 
 pub(crate) extern fn u128_to_felt252(a: u128) -> felt252 nopanic;
 
-extern fn u128_overflowing_add(
+pub extern fn u128_overflowing_add(
     lhs: u128, rhs: u128
 ) -> Result<u128, u128> implicits(RangeCheck) nopanic;
-extern fn u128_overflowing_sub(
+pub extern fn u128_overflowing_sub(
     lhs: u128, rhs: u128
 ) -> Result<u128, u128> implicits(RangeCheck) nopanic;
 
-fn u128_wrapping_add(lhs: u128, rhs: u128) -> u128 implicits(RangeCheck) nopanic {
+pub fn u128_wrapping_add(lhs: u128, rhs: u128) -> u128 implicits(RangeCheck) nopanic {
     match u128_overflowing_add(lhs, rhs) {
         Result::Ok(x) => x,
         Result::Err(x) => x,
@@ -79,7 +81,7 @@ impl U128MulGuaranteeDestruct of Destruct<U128MulGuarantee> {
 
 pub extern fn u128_sqrt(value: u128) -> u64 implicits(RangeCheck) nopanic;
 
-fn u128_overflowing_mul(lhs: u128, rhs: u128) -> (u128, bool) implicits(RangeCheck) nopanic {
+pub fn u128_overflowing_mul(lhs: u128, rhs: u128) -> (u128, bool) implicits(RangeCheck) nopanic {
     let (top_word, bottom_word) = u128_wide_mul(lhs, rhs);
     match u128_to_felt252(top_word) {
         0 => (bottom_word, false),
@@ -157,7 +159,7 @@ fn u128_try_as_non_zero(a: u128) -> Option<NonZero<u128>> nopanic {
 
 pub(crate) impl U128TryIntoNonZero of TryInto<u128, NonZero<u128>> {
     fn try_into(self: u128) -> Option<NonZero<u128>> {
-        Option::Some(u128_as_non_zero(self))
+        u128_try_as_non_zero(self)
     }
 }
 
@@ -230,6 +232,7 @@ impl U128PartialOrd of PartialOrd<u128> {
 }
 
 pub extern type Bitwise;
+/// Returns the bitwise operations (AND, XOR, OR) between `lhs` and `rhs`.
 extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise) nopanic;
 impl U128BitAnd of BitAnd<u128> {
     #[inline(always)]
@@ -310,10 +313,8 @@ impl U8PartialOrd of PartialOrd<u8> {
     }
 }
 
-pub(crate) extern fn u8_overflowing_add(
-    lhs: u8, rhs: u8
-) -> Result<u8, u8> implicits(RangeCheck) nopanic;
-extern fn u8_overflowing_sub(lhs: u8, rhs: u8) -> Result<u8, u8> implicits(RangeCheck) nopanic;
+pub extern fn u8_overflowing_add(lhs: u8, rhs: u8) -> Result<u8, u8> implicits(RangeCheck) nopanic;
+pub extern fn u8_overflowing_sub(lhs: u8, rhs: u8) -> Result<u8, u8> implicits(RangeCheck) nopanic;
 
 pub fn u8_wrapping_add(lhs: u8, rhs: u8) -> u8 implicits(RangeCheck) nopanic {
     match u8_overflowing_add(lhs, rhs) {
@@ -395,7 +396,7 @@ fn u8_try_as_non_zero(a: u8) -> Option<NonZero<u8>> nopanic {
 
 impl U8TryIntoNonZero of TryInto<u8, NonZero<u8>> {
     fn try_into(self: u8) -> Option<NonZero<u8>> {
-        Option::Some(u8_as_non_zero(self))
+        u8_try_as_non_zero(self)
     }
 }
 
@@ -507,10 +508,14 @@ impl U16PartialOrd of PartialOrd<u16> {
     }
 }
 
-extern fn u16_overflowing_add(lhs: u16, rhs: u16) -> Result<u16, u16> implicits(RangeCheck) nopanic;
-extern fn u16_overflowing_sub(lhs: u16, rhs: u16) -> Result<u16, u16> implicits(RangeCheck) nopanic;
+pub extern fn u16_overflowing_add(
+    lhs: u16, rhs: u16
+) -> Result<u16, u16> implicits(RangeCheck) nopanic;
+pub extern fn u16_overflowing_sub(
+    lhs: u16, rhs: u16
+) -> Result<u16, u16> implicits(RangeCheck) nopanic;
 
-fn u16_wrapping_add(lhs: u16, rhs: u16) -> u16 implicits(RangeCheck) nopanic {
+pub fn u16_wrapping_add(lhs: u16, rhs: u16) -> u16 implicits(RangeCheck) nopanic {
     match u16_overflowing_add(lhs, rhs) {
         Result::Ok(x) => x,
         Result::Err(x) => x,
@@ -592,7 +597,7 @@ fn u16_try_as_non_zero(a: u16) -> Option<NonZero<u16>> nopanic {
 
 impl U16TryIntoNonZero of TryInto<u16, NonZero<u16>> {
     fn try_into(self: u16) -> Option<NonZero<u16>> {
-        Option::Some(u16_as_non_zero(self))
+        u16_try_as_non_zero(self)
     }
 }
 
@@ -704,10 +709,14 @@ impl U32PartialOrd of PartialOrd<u32> {
     }
 }
 
-extern fn u32_overflowing_add(lhs: u32, rhs: u32) -> Result<u32, u32> implicits(RangeCheck) nopanic;
-extern fn u32_overflowing_sub(lhs: u32, rhs: u32) -> Result<u32, u32> implicits(RangeCheck) nopanic;
+pub extern fn u32_overflowing_add(
+    lhs: u32, rhs: u32
+) -> Result<u32, u32> implicits(RangeCheck) nopanic;
+pub extern fn u32_overflowing_sub(
+    lhs: u32, rhs: u32
+) -> Result<u32, u32> implicits(RangeCheck) nopanic;
 
-fn u32_wrapping_add(lhs: u32, rhs: u32) -> u32 implicits(RangeCheck) nopanic {
+pub fn u32_wrapping_add(lhs: u32, rhs: u32) -> u32 implicits(RangeCheck) nopanic {
     match u32_overflowing_add(lhs, rhs) {
         Result::Ok(x) => x,
         Result::Err(x) => x,
@@ -789,7 +798,7 @@ fn u32_try_as_non_zero(a: u32) -> Option<NonZero<u32>> nopanic {
 
 pub(crate) impl U32TryIntoNonZero of TryInto<u32, NonZero<u32>> {
     fn try_into(self: u32) -> Option<NonZero<u32>> {
-        Option::Some(u32_as_non_zero(self))
+        u32_try_as_non_zero(self)
     }
 }
 
@@ -901,10 +910,14 @@ impl U64PartialOrd of PartialOrd<u64> {
     }
 }
 
-extern fn u64_overflowing_add(lhs: u64, rhs: u64) -> Result<u64, u64> implicits(RangeCheck) nopanic;
-extern fn u64_overflowing_sub(lhs: u64, rhs: u64) -> Result<u64, u64> implicits(RangeCheck) nopanic;
+pub extern fn u64_overflowing_add(
+    lhs: u64, rhs: u64
+) -> Result<u64, u64> implicits(RangeCheck) nopanic;
+pub extern fn u64_overflowing_sub(
+    lhs: u64, rhs: u64
+) -> Result<u64, u64> implicits(RangeCheck) nopanic;
 
-fn u64_wrapping_add(lhs: u64, rhs: u64) -> u64 implicits(RangeCheck) nopanic {
+pub fn u64_wrapping_add(lhs: u64, rhs: u64) -> u64 implicits(RangeCheck) nopanic {
     match u64_overflowing_add(lhs, rhs) {
         Result::Ok(x) => x,
         Result::Err(x) => x,
@@ -986,7 +999,7 @@ fn u64_try_as_non_zero(a: u64) -> Option<NonZero<u64>> nopanic {
 
 impl U64TryIntoNonZero of TryInto<u64, NonZero<u64>> {
     fn try_into(self: u64) -> Option<NonZero<u64>> {
-        Option::Some(u64_as_non_zero(self))
+        u64_try_as_non_zero(self)
     }
 }
 
@@ -1063,7 +1076,7 @@ pub struct u256 {
 }
 impl NumericLiteralU256 of NumericLiteral<u256>;
 
-fn u256_overflowing_add(lhs: u256, rhs: u256) -> (u256, bool) implicits(RangeCheck) nopanic {
+pub fn u256_overflowing_add(lhs: u256, rhs: u256) -> (u256, bool) implicits(RangeCheck) nopanic {
     let (high, overflow) = match u128_overflowing_add(lhs.high, rhs.high) {
         Result::Ok(high) => (high, false),
         Result::Err(high) => (high, true),
@@ -1079,7 +1092,7 @@ fn u256_overflowing_add(lhs: u256, rhs: u256) -> (u256, bool) implicits(RangeChe
     }
 }
 
-fn u256_overflow_sub(lhs: u256, rhs: u256) -> (u256, bool) implicits(RangeCheck) nopanic {
+pub fn u256_overflow_sub(lhs: u256, rhs: u256) -> (u256, bool) implicits(RangeCheck) nopanic {
     let (high, overflow) = match u128_overflowing_sub(lhs.high, rhs.high) {
         Result::Ok(high) => (high, false),
         Result::Err(high) => (high, true),
@@ -1095,7 +1108,7 @@ fn u256_overflow_sub(lhs: u256, rhs: u256) -> (u256, bool) implicits(RangeCheck)
     }
 }
 
-fn u256_overflow_mul(lhs: u256, rhs: u256) -> (u256, bool) {
+pub fn u256_overflow_mul(lhs: u256, rhs: u256) -> (u256, bool) {
     let (high1, low) = u128_wide_mul(lhs.low, rhs.low);
     let (overflow_value1, high2) = u128_wide_mul(lhs.low, rhs.high);
     let (overflow_value2, high3) = u128_wide_mul(lhs.high, rhs.low);
@@ -1255,7 +1268,7 @@ fn u256_try_as_non_zero(a: u256) -> Option<NonZero<u256>> nopanic {
 
 pub(crate) impl U256TryIntoNonZero of TryInto<u256, NonZero<u256>> {
     fn try_into(self: u256) -> Option<NonZero<u256>> {
-        Option::Some(u256_as_non_zero(self))
+        u256_try_as_non_zero(self)
     }
 }
 
@@ -1362,6 +1375,16 @@ extern fn u512_safe_divmod_by_u256(
     U128MulGuarantee,
     U128MulGuarantee
 ) implicits(RangeCheck) nopanic;
+
+impl U512TryIntoU256 of TryInto<u512, u256> {
+    fn try_into(self: u512) -> Option<u256> {
+        if self.limb2 != 0 || self.limb3 != 0 {
+            Option::None
+        } else {
+            Option::Some(u256 { low: self.limb0, high: self.limb1 })
+        }
+    }
+}
 
 /// Bounded
 pub trait BoundedInt<T> {
@@ -1774,7 +1797,7 @@ impl U8IntoU256 of Into<u8, u256> {
 
 impl U256TryIntoU8 of TryInto<u256, u8> {
     fn try_into(self: u256) -> Option<u8> {
-        let u256{low: low, high: high } = self;
+        let u256 { low, high } = self;
 
         if high != 0 {
             return Option::None;
@@ -1792,7 +1815,7 @@ impl U16IntoU256 of Into<u16, u256> {
 
 impl U256TryIntoU16 of TryInto<u256, u16> {
     fn try_into(self: u256) -> Option<u16> {
-        let u256{low: low, high: high } = self;
+        let u256 { low, high } = self;
 
         if high != 0 {
             return Option::None;
@@ -1810,7 +1833,7 @@ impl U32IntoU256 of Into<u32, u256> {
 
 impl U256TryIntoU32 of TryInto<u256, u32> {
     fn try_into(self: u256) -> Option<u32> {
-        let u256{low: low, high: high } = self;
+        let u256 { low, high } = self;
 
         if high != 0 {
             return Option::None;
@@ -1828,7 +1851,7 @@ impl U64IntoU256 of Into<u64, u256> {
 
 impl U256TryIntoU64 of TryInto<u256, u64> {
     fn try_into(self: u256) -> Option<u64> {
-        let u256{low: low, high: high } = self;
+        let u256 { low, high } = self;
 
         if high != 0 {
             return Option::None;
@@ -1846,7 +1869,7 @@ impl U128IntoU256 of Into<u128, u256> {
 
 impl U256TryIntoU128 of TryInto<u256, u128> {
     fn try_into(self: u256) -> Option<u128> {
-        let u256{low: low, high: high } = self;
+        let u256 { low, high } = self;
 
         if high != 0 {
             return Option::None;
@@ -2734,3 +2757,290 @@ impl I128One of core::num::traits::One<i128> {
         !self.is_one()
     }
 }
+
+// OverflowingAdd implementations
+impl U8OverflowingAdd of core::num::traits::OverflowingAdd<u8> {
+    fn overflowing_add(self: u8, v: u8) -> (u8, bool) {
+        match u8_overflowing_add(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U16OverflowingAdd of core::num::traits::OverflowingAdd<u16> {
+    fn overflowing_add(self: u16, v: u16) -> (u16, bool) {
+        match u16_overflowing_add(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U32OverflowingAdd of core::num::traits::OverflowingAdd<u32> {
+    fn overflowing_add(self: u32, v: u32) -> (u32, bool) {
+        match u32_overflowing_add(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U64OverflowingAdd of core::num::traits::OverflowingAdd<u64> {
+    fn overflowing_add(self: u64, v: u64) -> (u64, bool) {
+        match u64_overflowing_add(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U128OverflowingAdd of core::num::traits::OverflowingAdd<u128> {
+    fn overflowing_add(self: u128, v: u128) -> (u128, bool) {
+        match u128_overflowing_add(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U256OverflowingAdd of core::num::traits::OverflowingAdd<u256> {
+    fn overflowing_add(self: u256, v: u256) -> (u256, bool) {
+        u256_overflowing_add(self, v)
+    }
+}
+
+impl I8OverflowingAdd of core::num::traits::OverflowingAdd<i8> {
+    fn overflowing_add(self: i8, v: i8) -> (i8, bool) {
+        match i8_overflowing_add_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I16OverflowingAdd of core::num::traits::OverflowingAdd<i16> {
+    fn overflowing_add(self: i16, v: i16) -> (i16, bool) {
+        match i16_overflowing_add_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I32OverflowingAdd of core::num::traits::OverflowingAdd<i32> {
+    fn overflowing_add(self: i32, v: i32) -> (i32, bool) {
+        match i32_overflowing_add_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I64OverflowingAdd of core::num::traits::OverflowingAdd<i64> {
+    fn overflowing_add(self: i64, v: i64) -> (i64, bool) {
+        match i64_overflowing_add_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I128OverflowingAdd of core::num::traits::OverflowingAdd<i128> {
+    fn overflowing_add(self: i128, v: i128) -> (i128, bool) {
+        match i128_overflowing_add_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+// OverflowingSub implementations
+impl U8OverflowingSub of core::num::traits::OverflowingSub<u8> {
+    fn overflowing_sub(self: u8, v: u8) -> (u8, bool) {
+        match u8_overflowing_sub(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U16OverflowingSub of core::num::traits::OverflowingSub<u16> {
+    fn overflowing_sub(self: u16, v: u16) -> (u16, bool) {
+        match u16_overflowing_sub(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U32OverflowingSub of core::num::traits::OverflowingSub<u32> {
+    fn overflowing_sub(self: u32, v: u32) -> (u32, bool) {
+        match u32_overflowing_sub(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U64OverflowingSub of core::num::traits::OverflowingSub<u64> {
+    fn overflowing_sub(self: u64, v: u64) -> (u64, bool) {
+        match u64_overflowing_sub(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U128OverflowingSub of core::num::traits::OverflowingSub<u128> {
+    fn overflowing_sub(self: u128, v: u128) -> (u128, bool) {
+        match u128_overflowing_sub(self, v) {
+            Result::Ok(x) => (x, false),
+            Result::Err(x) => (x, true)
+        }
+    }
+}
+
+impl U256OverflowingSub of core::num::traits::OverflowingSub<u256> {
+    fn overflowing_sub(self: u256, v: u256) -> (u256, bool) {
+        u256_overflow_sub(self, v)
+    }
+}
+
+impl I8OverflowingSub of core::num::traits::OverflowingSub<i8> {
+    fn overflowing_sub(self: i8, v: i8) -> (i8, bool) {
+        match i8_overflowing_sub_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I16OverflowingSub of core::num::traits::OverflowingSub<i16> {
+    fn overflowing_sub(self: i16, v: i16) -> (i16, bool) {
+        match i16_overflowing_sub_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I32OverflowingSub of core::num::traits::OverflowingSub<i32> {
+    fn overflowing_sub(self: i32, v: i32) -> (i32, bool) {
+        match i32_overflowing_sub_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I64OverflowingSub of core::num::traits::OverflowingSub<i64> {
+    fn overflowing_sub(self: i64, v: i64) -> (i64, bool) {
+        match i64_overflowing_sub_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+impl I128OverflowingSub of core::num::traits::OverflowingSub<i128> {
+    fn overflowing_sub(self: i128, v: i128) -> (i128, bool) {
+        match i128_overflowing_sub_impl(self, v) {
+            SignedIntegerResult::InRange(x) => (x, false),
+            SignedIntegerResult::Underflow(x) => (x, true),
+            SignedIntegerResult::Overflow(x) => (x, true),
+        }
+    }
+}
+
+// OverflowingMul implementations
+impl U8OverflowingMul of core::num::traits::OverflowingMul<u8> {
+    fn overflowing_mul(self: u8, v: u8) -> (u8, bool) {
+        let wide_result = u8_wide_mul(self, v);
+        let MASK: u16 = BoundedInt::<u8>::max().into();
+        let (v_low, _, v_with_low_masked) = u16_bitwise(wide_result, MASK);
+        (v_low.try_into().unwrap(), v_with_low_masked != MASK)
+    }
+}
+
+impl U16OverflowingMul of core::num::traits::OverflowingMul<u16> {
+    fn overflowing_mul(self: u16, v: u16) -> (u16, bool) {
+        let wide_result = u16_wide_mul(self, v);
+        let MASK: u32 = BoundedInt::<u16>::max().into();
+        let (v_low, _, v_with_low_masked) = u32_bitwise(wide_result, MASK);
+        (v_low.try_into().unwrap(), v_with_low_masked != MASK)
+    }
+}
+
+impl U32OverflowingMul of core::num::traits::OverflowingMul<u32> {
+    fn overflowing_mul(self: u32, v: u32) -> (u32, bool) {
+        let wide_result = u32_wide_mul(self, v);
+        let MASK: u64 = BoundedInt::<u32>::max().into();
+        let (v_low, _, v_with_low_masked) = u64_bitwise(wide_result, MASK);
+        (v_low.try_into().unwrap(), v_with_low_masked != MASK)
+    }
+}
+
+impl U64OverflowingMul of core::num::traits::OverflowingMul<u64> {
+    fn overflowing_mul(self: u64, v: u64) -> (u64, bool) {
+        let wide_result = u64_wide_mul(self, v);
+        let MASK: u128 = BoundedInt::<u64>::max().into();
+        let (v_low, _, v_with_low_masked) = bitwise(wide_result, MASK);
+        (v_low.try_into().unwrap(), v_with_low_masked != MASK)
+    }
+}
+
+impl U128OverflowingMul of core::num::traits::OverflowingMul<u128> {
+    fn overflowing_mul(self: u128, v: u128) -> (u128, bool) {
+        u128_overflowing_mul(self, v)
+    }
+}
+
+impl U256OverflowingMul of core::num::traits::OverflowingMul<u256> {
+    fn overflowing_mul(self: u256, v: u256) -> (u256, bool) {
+        u256_overflow_mul(self, v)
+    }
+}
+
+/// WrappingAdd implementations
+impl U8WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<u8>;
+impl U16WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<u16>;
+impl U32WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<u32>;
+impl U64WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<u64>;
+impl U128WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<u128>;
+impl U256WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<u256>;
+impl I8WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<i8>;
+impl I16WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<i16>;
+impl I32WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<i32>;
+impl I64WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<i64>;
+impl I128WrappingAdd = core::num::traits::ops::wrapping::overflow_based::TWrappingAdd<i128>;
+
+/// WrappingSub implementations
+impl U8WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<u8>;
+impl U16WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<u16>;
+impl U32WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<u32>;
+impl U64WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<u64>;
+impl U128WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<u128>;
+impl U256WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<u256>;
+impl I8WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<i8>;
+impl I16WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<i16>;
+impl I32WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<i32>;
+impl I64WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<i64>;
+impl I128WrappingSub = core::num::traits::ops::wrapping::overflow_based::TWrappingSub<i128>;
+
+/// WrappingMul implementations
+impl U8WrappingMul = core::num::traits::ops::wrapping::overflow_based::TWrappingMul<u8>;
+impl U16WrappingMul = core::num::traits::ops::wrapping::overflow_based::TWrappingMul<u16>;
+impl U32WrappingMul = core::num::traits::ops::wrapping::overflow_based::TWrappingMul<u32>;
+impl U64WrappingMul = core::num::traits::ops::wrapping::overflow_based::TWrappingMul<u64>;
+impl U128WrappingMul = core::num::traits::ops::wrapping::overflow_based::TWrappingMul<u128>;
+impl U256WrappingMul = core::num::traits::ops::wrapping::overflow_based::TWrappingMul<u256>;

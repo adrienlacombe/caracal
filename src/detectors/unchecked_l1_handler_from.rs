@@ -40,8 +40,18 @@ impl Detector for UncheckedL1HandlerFrom {
                 .collect();
 
             for f in l1_handler_funcs {
-                let from_address =
-                    f.params().map(|p| p.id.clone()).collect::<Vec<VarId>>()[1].clone();
+                // In cairo < 2.6 the user's l1_handler body existed as its own
+                // function with the signature (self: @ContractState, from_address, ...)
+                // and `from_address` was the 2nd non-builtin parameter. In cairo
+                // >= 2.6 the body is inlined into `__wrapper__*` whose only
+                // non-builtin parameter is the raw `Span<felt252>` calldata, so
+                // we can no longer identify `from_address` structurally. Skip
+                // those until the detector is rewritten for the new shape.
+                let params_vec: Vec<VarId> = f.params().map(|p| p.id.clone()).collect();
+                if params_vec.len() < 2 {
+                    continue;
+                }
+                let from_address = params_vec[1].clone();
                 let mut sources = FxHashSet::default();
                 sources.insert(WrapperVariable::new(f.name(), from_address.id));
 

@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use std::fs;
 
 use cairo_lang_sierra::program::Program;
-use cairo_lang_starknet::abi::Contract;
+use cairo_lang_starknet_classes::abi::Contract;
 
 use crate::core::core_unit::CoreOpts;
 
