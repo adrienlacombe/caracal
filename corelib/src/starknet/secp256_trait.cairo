@@ -44,7 +44,6 @@ use core::array::ArrayTrait;
 #[allow(unused_imports)]
 use core::integer::U256TryIntoNonZero;
 use core::math::{u256_inv_mod, u256_mul_mod_n};
-use core::option::OptionTrait;
 use core::traits::{Into, TryInto};
 #[allow(unused_imports)]
 use starknet::eth_address::U256IntoEthAddress;
@@ -208,9 +207,7 @@ pub trait Secp256PointTrait<Secp256Point> {
 /// Checks whether the given `value` is in the range [1, N), where N is the size of the curve.
 ///
 /// For ECDSA signatures to be secure, both `r` and `s` components must be in the range [1, N),
-/// where N is the order of the curve. Enforcing this range prevents signature malleability attacks
-/// where an attacker could create multiple valid signatures for the same message by adding
-/// multiples of N.
+/// where N is the order of the curve.
 /// This function validates that a given value meets this requirement.
 ///
 /// # Returns
@@ -231,6 +228,32 @@ pub fn is_signature_entry_valid<
     value: u256,
 ) -> bool {
     value != 0_u256 && value < Secp256Impl::get_curve_size()
+}
+
+/// Checks whether the given `s` is in the range [1, N / 2), where N is the size of the curve.
+///
+/// For ECDSA signatures to be secure, the `s` component must be in the range [1, N / 2),
+/// where N is the order of the curve.
+/// This function validates that a given value meets this requirement.
+///
+/// # Returns
+///
+/// Returns `true` if the value is in the valid range [1, N / 2), `false` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use starknet::secp256r1::Secp256r1Point;
+/// use starknet::secp256_trait::is_signature_s_valid;
+///
+/// assert!(!is_signature_s_valid::<Secp256r1Point>(0));
+/// ```
+pub(crate) fn is_signature_s_valid<
+    Secp256Point, +Drop<Secp256Point>, impl Secp256Impl: Secp256Trait<Secp256Point>,
+>(
+    s: u256,
+) -> bool {
+    s != 0_u256 && s <= Secp256Impl::get_curve_size() / 2
 }
 
 /// Checks whether a signature is valid given a public key point and a message hash.
@@ -262,21 +285,19 @@ pub fn is_valid_signature<
 >(
     msg_hash: u256, r: u256, s: u256, public_key: Secp256Point,
 ) -> bool {
-    if !is_signature_entry_valid::<Secp256Point>(r)
-        || !is_signature_entry_valid::<Secp256Point>(s) {
+    if !is_signature_entry_valid::<Secp256Point>(r) || !is_signature_s_valid::<Secp256Point>(s) {
         return false;
     }
 
-    let n_nz = match Secp256Impl::get_curve_size().try_into() {
-        Some(v) => v,
-        None => { return false; },
+    let Some(order) = Secp256Impl::get_curve_size().try_into() else {
+        return false;
     };
-    let s_inv = match u256_inv_mod(s, n_nz) {
-        Some(v) => v.into(),
-        None => { return false; },
+    let Some(s_inv) = u256_inv_mod(s, order) else {
+        return false;
     };
-    let u1 = u256_mul_mod_n(msg_hash, s_inv, n_nz);
-    let u2 = u256_mul_mod_n(r, s_inv, n_nz);
+    let s_inv = s_inv.into();
+    let u1 = u256_mul_mod_n(msg_hash, s_inv, order);
+    let u2 = u256_mul_mod_n(r, s_inv, order);
 
     let generator_point = Secp256Impl::get_generator_point();
     let point1 = generator_point.mul(u1).unwrap_syscall();
@@ -316,6 +337,10 @@ pub fn recover_public_key<
     msg_hash: u256, signature: Signature,
 ) -> Option<Secp256Point> {
     let Signature { r, s, y_parity } = signature;
+    if !is_signature_entry_valid::<Secp256Point>(r) || !is_signature_s_valid::<Secp256Point>(s) {
+        return None;
+    }
+    // Note this additionally checks that `r` is valid.
     let r_point = Secp256Impl::secp256_ec_get_point_from_x_syscall(x: r, :y_parity)
         .unwrap_syscall()?;
     let generator_point = Secp256Impl::get_generator_point();
@@ -324,8 +349,8 @@ pub fn recover_public_key<
     //   -(msg_hash / r) * gen + (s / r) * r_point
     // where the divisions by `r` are modulo `N` (the size of the curve).
 
-    let n_nz = Secp256Impl::get_curve_size().try_into().unwrap();
-    let r_inv = u256_inv_mod(r.try_into().unwrap(), n_nz).unwrap().into();
+    let n_nz = Secp256Impl::get_curve_size().try_into()?;
+    let r_inv = u256_inv_mod(r.try_into()?, n_nz)?.into();
 
     let u1 = u256_mul_mod_n(msg_hash, r_inv, n_nz);
     let minus_u1 = secp256_ec_negate_scalar::<Secp256Point>(u1);

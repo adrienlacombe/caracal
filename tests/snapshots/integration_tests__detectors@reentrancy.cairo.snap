@@ -4,11 +4,4 @@ assertion_line: 23
 expression: results
 input_file: tests/detectors/reentrancy.cairo
 ---
-[
-    Result {
-        impact: Low,
-        name: "use-after-pop-front",
-        confidence: Medium,
-        message: "The span [8] is used after removing elements from it in the function reentrancy::reentrancy::TestContract::__wrapper__bad2",
-    },
-]
+[]
