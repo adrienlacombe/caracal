@@ -6,6 +6,12 @@ input_file: tests/detectors/unchecked_l1_handler_from.cairo
 ---
 [
     Result {
+        impact: High,
+        name: "unchecked-l1-handler-from",
+        confidence: Medium,
+        message: "The L1 handler function unchecked_l1_handler_from::unchecked_l1_handler_from::UncheckedL1HandlerFrom::__wrapper__bad does not check the L1 from address",
+    },
+    Result {
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,

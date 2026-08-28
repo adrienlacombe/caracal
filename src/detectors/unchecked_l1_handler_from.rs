@@ -40,20 +40,45 @@ impl Detector for UncheckedL1HandlerFrom {
                 .collect();
 
             for f in l1_handler_funcs {
-                // In cairo < 2.6 the user's l1_handler body existed as its own
-                // function with the signature (self: @ContractState, from_address, ...)
-                // and `from_address` was the 2nd non-builtin parameter. In cairo
-                // >= 2.6 the body is inlined into `__wrapper__*` whose only
-                // non-builtin parameter is the raw `Span<felt252>` calldata, so
-                // we can no longer identify `from_address` structurally. Skip
-                // those until the detector is rewritten for the new shape.
-                let params_vec: Vec<VarId> = f.params().map(|p| p.id.clone()).collect();
-                if params_vec.len() < 2 {
-                    continue;
-                }
-                let from_address = params_vec[1].clone();
                 let mut sources = FxHashSet::default();
-                sources.insert(WrapperVariable::new(f.name(), from_address.id));
+                if f.name().contains("::__wrapper__") {
+                    // Since cairo 2.6 the handler body is inlined into a
+                    // `__wrapper__*` whose only data parameter is the raw
+                    // `Span<felt252>` calldata; `from_address` no longer
+                    // exists as a parameter. The OS prepends it to the
+                    // calldata, and deserialization runs before any user
+                    // code, so the first `array_snapshot_pop_front<felt252>`
+                    // of the wrapper pops exactly `from_address` — seed the
+                    // taint source with the popped box (the taint map flows
+                    // it through `unbox` and the stores on its own).
+                    let box_var = f.get_statements().iter().find_map(|stmt| match stmt {
+                        SierraStatement::Invocation(invoc)
+                            if invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
+                                n.starts_with("array_snapshot_pop_front<felt252>")
+                            }) =>
+                        {
+                            invoc
+                                .branches
+                                .first()
+                                .and_then(|b| b.results.get(1))
+                                .map(|v| v.id)
+                        }
+                        _ => None,
+                    });
+                    let Some(box_var) = box_var else {
+                        continue;
+                    };
+                    sources.insert(WrapperVariable::new(f.name(), box_var));
+                } else {
+                    // Pre-2.6 shape: the handler is its own function with the
+                    // signature (self: @ContractState, from_address, ...) and
+                    // `from_address` is the 2nd parameter.
+                    let params_vec: Vec<VarId> = f.params().map(|p| p.id.clone()).collect();
+                    if params_vec.len() < 2 {
+                        continue;
+                    }
+                    sources.insert(WrapperVariable::new(f.name(), params_vec[1].id));
+                }
 
                 // Used to avoid infinite recursion in case of recursive private function calls
                 let mut checked_private_functions = HashSet::new();
@@ -142,14 +167,26 @@ impl UncheckedL1HandlerFrom {
                             .map(|v| WrapperVariable::new(function.name(), v.id))
                             .collect();
 
+                        // The i-th call argument binds the callee's i-th
+                        // parameter, so map tainted arguments to callee
+                        // parameters by position. (The old id arithmetic
+                        // `sink - args[0]` assumed consecutively numbered
+                        // caller arguments, which post-2.6 codegen breaks.)
+                        let callee_params: Vec<u64> =
+                            private_function.params_all().map(|p| p.id.id).collect();
+
                         let from_tainted_args: FxHashSet<WrapperVariable> = from_tainted_args
                             .iter()
                             .flat_map(|source| taint.taints_any_sinks_variable(source, &sinks))
-                            .map(|sink| {
-                                WrapperVariable::new(
-                                    private_function.name(),
-                                    sink.variable() - invoc.args[0].id,
-                                )
+                            .filter_map(|sink| {
+                                invoc
+                                    .args
+                                    .iter()
+                                    .position(|a| a.id == sink.variable())
+                                    .and_then(|pos| callee_params.get(pos))
+                                    .map(|param| {
+                                        WrapperVariable::new(private_function.name(), *param)
+                                    })
                             })
                             .collect();
 
