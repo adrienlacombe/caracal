@@ -58,7 +58,7 @@ The synthetic fixtures can't catch a compiler bump silently killing a detector o
 - Compiler behavior changes across Cairo versions can silently neuter detectors. Precedent: `unused_arguments` went inert on Cairo ≥ 2.6 (documented in commit `61488ce`, revived by the inlining-avoid change in `329fb95` — it stays inert only on pre-inlined artifacts). `dead_code` is still inert: the compiler drops unreachable functions from SIERRA entirely. When a detector stops firing after a compiler bump, check codegen changes before assuming the detector is wrong, and document inert detectors in code comments rather than deleting them.
 - Some detectors are version-gated (README "Cairo" column, 1 vs 2). This fork targets Cairo 2.x.
 - `Cargo.lock` is committed (binary crate) — keep it in sync when touching `Cargo.toml`. Note the `starknet-types-core = "=0.1.7"` pin and its explanatory comment; don't bump it without checking the ARM build issue described there.
-- Upgrading the Cairo compiler means: bump every `cairo-lang-*` tag together, replace `corelib/` with the matching version, then re-run and re-review all snapshots.
+- Upgrading the Cairo compiler: run `scripts/bump-cairo.sh <tag>` — it retags every `cairo-lang-*` dep, replaces `corelib/` wholesale with the upstream corelib at that tag, rebuilds (refreshing `Cargo.lock`), runs the tests, and reports per-detector snapshot drift without promoting anything. Then follow its printed checklist: review/promote snapshots, and re-pin + re-bless the corpus job (`scripts/corpus.sh`).
 
 ## Git conventions
 
