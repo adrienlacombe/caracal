@@ -11,7 +11,7 @@ expression: sarif
         "driver": {
           "name": "caracal",
           "informationUri": "https://github.com/crytic/caracal",
-          "version": "0.2.3",
+          "version": "0.3.0",
           "rules": [
             {
               "id": "use-after-pop-front",
