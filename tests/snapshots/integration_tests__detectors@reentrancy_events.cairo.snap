@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 23
 expression: results
 input_file: tests/detectors/reentrancy_events.cairo
 ---
@@ -10,5 +9,11 @@ input_file: tests/detectors/reentrancy_events.cairo
         name: "reentrancy-events",
         confidence: Medium,
         message: "Reentrancy in reentrancy_events::reentrancy_events::TestContract::__wrapper__bad1\n\tExternal call to reentrancy_events::reentrancy_events::IAnotherContractDispatcherImpl::foo done in reentrancy_events::reentrancy_events::TestContract::bad1\n\tEvent emitted after the call by reentrancy_events::reentrancy_events::TestContract::ContractStateEventEmitter::emit in reentrancy_events::reentrancy_events::TestContract::bad1.",
+    },
+    Result {
+        impact: Low,
+        name: "reentrancy-events",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy_events::reentrancy_events::TestContract::__wrapper__bad2_emit_between_calls\n\tExternal call to reentrancy_events::reentrancy_events::IAnotherContractDispatcherImpl::foo (1st occurrence) done in reentrancy_events::reentrancy_events::TestContract::bad2_emit_between_calls\n\tEvent emitted after the call by reentrancy_events::reentrancy_events::TestContract::ContractStateEventEmitter::emit in reentrancy_events::reentrancy_events::TestContract::bad2_emit_between_calls.",
     },
 ]

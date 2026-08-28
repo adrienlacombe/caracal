@@ -17,6 +17,16 @@ pub struct ReentrancyInfo {
     /// Set of variables read before a function call. call -> variables
     pub variables_read_before_calls: HashMap<BasicBlock, HashSet<BasicBlock>>,
     pub events: HashSet<BasicBlock>,
+    /// Writes already seen when a call was registered. call -> writes.
+    /// On the analyzed function's own CFG write/event ordering is implicit
+    /// (writes and events are block-local, so a block's post state can only
+    /// pair them with calls from earlier blocks), but the private-call
+    /// recursion flattens a whole call tree into one block's state, where a
+    /// call would otherwise get paired with writes/events that happened
+    /// strictly before it. The detectors skip pairs recorded here.
+    pub writes_before_calls: HashMap<BasicBlock, HashSet<BasicBlock>>,
+    /// Events already seen when a call was registered. call -> events.
+    pub events_before_calls: HashMap<BasicBlock, HashSet<BasicBlock>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,6 +63,12 @@ impl Domain for ReentrancyDomain {
                 new_state
                     .variables_read_before_calls
                     .extend(b.variables_read_before_calls.clone());
+                new_state
+                    .writes_before_calls
+                    .extend(b.writes_before_calls.clone());
+                new_state
+                    .events_before_calls
+                    .extend(b.events_before_calls.clone());
                 Self::State(new_state)
             }
             // If self is bottom and other is not, clone other in self.
@@ -64,6 +80,8 @@ impl Domain for ReentrancyDomain {
                 storage_variables_written: HashSet::new(),
                 variables_read_before_calls: a.variables_read_before_calls.clone(),
                 events: HashSet::new(),
+                writes_before_calls: a.writes_before_calls.clone(),
+                events_before_calls: a.events_before_calls.clone(),
             })),
             _ => Self::Top,
         };
@@ -114,7 +132,15 @@ impl ReentrancyAnalysis {
     /// a call are visible to the detectors. The recursion flattens the
     /// callee's basic blocks into a single accumulating state, losing that
     /// ordering; emulate it by recording a write/event only when an external
-    /// call was already seen.
+    /// call was already seen. That guard only orders effects against the
+    /// *first* call: a write/event between two calls still lands in the same
+    /// flattened state as the later call, so each call registration also
+    /// snapshots the writes/events seen so far (`writes_before_calls` /
+    /// `events_before_calls`) and the detectors skip those pairs. The
+    /// recursion is a single pass in basic-block order, so re-execution
+    /// orderings inside loop bodies (a write textually before a call running
+    /// again after it) are not modeled — same approximation as
+    /// `variables_read_before_calls`.
     #[allow(clippy::too_many_arguments)]
     fn transfer_function_helper(
         basic_block: &BasicBlock,
@@ -160,6 +186,13 @@ impl ReentrancyAnalysis {
                                     basic_block.clone(),
                                     HashSet::from_iter(inner_state.storage_variables_read.clone()),
                                 );
+                                inner_state.writes_before_calls.insert(
+                                    basic_block.clone(),
+                                    inner_state.storage_variables_written.clone(),
+                                );
+                                inner_state
+                                    .events_before_calls
+                                    .insert(basic_block.clone(), inner_state.events.clone());
                             }
                             StarknetConcreteLibfunc::EmitEvent(_)
                                 if !in_recursion || !inner_state.external_calls.is_empty() =>
@@ -257,6 +290,14 @@ impl ReentrancyAnalysis {
                                             HashSet::from_iter(
                                                 inner_state.storage_variables_read.clone(),
                                             ),
+                                        );
+                                        inner_state.writes_before_calls.insert(
+                                            basic_block.clone(),
+                                            inner_state.storage_variables_written.clone(),
+                                        );
+                                        inner_state.events_before_calls.insert(
+                                            basic_block.clone(),
+                                            inner_state.events.clone(),
                                         );
                                     }
 

@@ -40,6 +40,17 @@ impl Detector for ReentrancyEvents {
                     {
                         for event in reentrancy_info.events.iter() {
                             for call in reentrancy_info.external_calls.iter() {
+                                // The event had already been emitted when this
+                                // call was made (ordering snapshot taken at
+                                // call registration) — not "emitted after the
+                                // call".
+                                if reentrancy_info
+                                    .events_before_calls
+                                    .get(call)
+                                    .is_some_and(|events| events.contains(event))
+                                {
+                                    continue;
+                                }
                                 let external_function_call = statement_summary_in_named_function(
                                     compilation_unit,
                                     call.get_function(),

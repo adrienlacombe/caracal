@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 23
 expression: results
 input_file: tests/detectors/reentrancy_benign.cairo
 ---
@@ -46,5 +45,11 @@ input_file: tests/detectors/reentrancy_benign.cairo
         name: "reentrancy-benign",
         confidence: Medium,
         message: "Reentrancy in reentrancy_benign::reentrancy_benign::TestContract::__wrapper__bad4\n\tExternal call to reentrancy_benign::reentrancy_benign::IAnotherContractDispatcherImpl::foo done in reentrancy_benign::reentrancy_benign::TestContract::internal_ext_call2\n\tStorage variable #0 of reentrancy_benign::reentrancy_benign::TestContract written after the call by core::starknet::storage::StorablePointerWriteAccessImpl::write in reentrancy_benign::reentrancy_benign::TestContract::bad4.",
+    },
+    Result {
+        impact: Low,
+        name: "reentrancy-benign",
+        confidence: Medium,
+        message: "Reentrancy in reentrancy_benign::reentrancy_benign::TestContract::__wrapper__bad5_write_between_calls\n\tExternal call to reentrancy_benign::reentrancy_benign::IAnotherContractDispatcherImpl::foo (1st occurrence) done in reentrancy_benign::reentrancy_benign::TestContract::bad5_write_between_calls\n\tStorage variable #0 of reentrancy_benign::reentrancy_benign::TestContract written after the call by core::starknet::storage::StorablePointerWriteAccessImpl::write in reentrancy_benign::reentrancy_benign::TestContract::bad5_write_between_calls.",
     },
 ]

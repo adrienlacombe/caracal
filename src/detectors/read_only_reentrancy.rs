@@ -76,6 +76,17 @@ impl Detector for ReadOnlyReentrancy {
 
                             for written_variable in reentrancy_info.storage_variables_written.iter()
                             {
+                                // The write had already happened when this
+                                // call was made (ordering snapshot taken at
+                                // call registration) — not "written after the
+                                // call".
+                                if reentrancy_info
+                                    .writes_before_calls
+                                    .get(call)
+                                    .is_some_and(|writes| writes.contains(written_variable))
+                                {
+                                    continue;
+                                }
                                 // The write may live in another function than
                                 // `f` (recorded through private-call recursion),
                                 // so trace it within its owning function's
