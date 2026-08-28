@@ -1,6 +1,6 @@
 # Caracal — agent guide
 
-Caracal is a static analyzer for Starknet smart contracts, written in Rust. It compiles Cairo source to SIERRA and runs detectors/printers over the SIERRA representation — it never analyzes Cairo source directly. This repo is a fork of `crytic/caracal` upgraded to Cairo compiler **v2.18.0** (all `cairo-lang-*` deps are pinned to that git tag in `Cargo.toml`; the vendored `corelib/` matches it).
+Caracal is a static analyzer for Starknet smart contracts, written in Rust. It compiles Cairo source to SIERRA and runs detectors/printers over the SIERRA representation — it never analyzes Cairo source directly. This repo is a fork of `crytic/caracal` upgraded to Cairo compiler **v2.20.0** (all `cairo-lang-*` deps are pinned to that git tag in `Cargo.toml`; the vendored `corelib/` matches it). Cairo ≥ 2.19 requires rustc ≥ 1.94.
 
 ## Build, test, lint
 
@@ -36,7 +36,7 @@ cargo fmt --all             # rustfmt, checked in CI
 | `src/cli/` | clap-based CLI (`detect`, `print`, `detectors`, `printers` subcommands) |
 | `tests/detectors/` | Cairo fixtures, one per detector, named after the detector file |
 | `tests/snapshots/` | insta snapshots (committed) |
-| `corelib/` | Vendored Cairo corelib v2.18.0 — do not modify; replace wholesale when bumping the compiler |
+| `corelib/` | Vendored Cairo corelib (version matches the pinned compiler) — do not modify; replace wholesale when bumping the compiler |
 
 ## Adding a detector
 
