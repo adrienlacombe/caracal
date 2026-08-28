@@ -1,0 +1,20 @@
+---
+source: tests/integration_tests.rs
+assertion_line: 23
+expression: results
+input_file: tests/detectors/controlled_l1_message.cairo
+---
+[
+    Result {
+        impact: Medium,
+        name: "controlled-l1-message",
+        confidence: Medium,
+        message: "send_message_to_l1_syscall with user controlled to_address in controlled_l1_message::controlled_l1_message::L1MessageContract::bad_direct\n send_message_to_l1_syscall",
+    },
+    Result {
+        impact: Medium,
+        name: "controlled-l1-message",
+        confidence: Medium,
+        message: "send_message_to_l1_syscall with user controlled to_address in controlled_l1_message::controlled_l1_message::L1MessageContract::do_send\n send_message_to_l1_syscall",
+    },
+]

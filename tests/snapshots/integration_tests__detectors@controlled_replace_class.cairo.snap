@@ -17,4 +17,22 @@ input_file: tests/detectors/controlled_replace_class.cairo
         confidence: Medium,
         message: "replace_class_syscall with user controlled class hash in controlled_replace_class::controlled_replace_class::ReplaceClassContract::do_replace\n replace_class_syscall",
     },
+    Result {
+        impact: High,
+        name: "unprotected-replace-class",
+        confidence: Low,
+        message: "The external function controlled_replace_class::controlled_replace_class::ReplaceClassContract::__wrapper__bad_direct can replace the contract class without a caller address check",
+    },
+    Result {
+        impact: High,
+        name: "unprotected-replace-class",
+        confidence: Low,
+        message: "The external function controlled_replace_class::controlled_replace_class::ReplaceClassContract::__wrapper__bad_indirect can replace the contract class without a caller address check",
+    },
+    Result {
+        impact: High,
+        name: "unprotected-replace-class",
+        confidence: Low,
+        message: "The external function controlled_replace_class::controlled_replace_class::ReplaceClassContract::__wrapper__good_stored can replace the contract class without a caller address check",
+    },
 ]

@@ -1,0 +1,20 @@
+---
+source: tests/integration_tests.rs
+assertion_line: 23
+expression: results
+input_file: tests/detectors/unprotected_replace_class.cairo
+---
+[
+    Result {
+        impact: High,
+        name: "unprotected-replace-class",
+        confidence: Low,
+        message: "The external function unprotected_replace_class::unprotected_replace_class::UnprotectedReplaceClass::__wrapper__bad_upgrade can replace the contract class without a caller address check",
+    },
+    Result {
+        impact: High,
+        name: "unprotected-replace-class",
+        confidence: Low,
+        message: "The external function unprotected_replace_class::unprotected_replace_class::UnprotectedReplaceClass::__wrapper__bad_upgrade_indirect can replace the contract class without a caller address check",
+    },
+]

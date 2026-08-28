@@ -42,6 +42,7 @@ cargo fmt --all             # rustfmt, checked in CI
 
 1. Create `src/detectors/<name>.rs` implementing the `Detector` trait (`name`, `description`, `impact`, `confidence`, `run(&self, core: &CoreUnit) -> HashSet<Result>`). Kebab-case the public name (`"controlled-replace-class"`), snake_case the file.
 2. Register it in `src/detectors/mod.rs`: add the `pub mod` line and a `Box::<...>::default()` entry in `get_detectors()`.
+   - Build finding messages with the `statement_summary_in_function` / `statement_summary_in_named_function` helpers in `src/utils/mod.rs`, never `format!("{stmt}")` — VarIds and branch targets are compiler-assigned and churn on every compiler bump.
 3. Add a fixture `tests/detectors/<name>.cairo` with both vulnerable and safe variants, run `cargo test`, and accept the new snapshot.
 4. Add a row to the detectors table in `README.md`.
 5. Detectors typically walk `core.get_compilation_units()` → functions → SIERRA statements, matching on `CoreConcreteLibfunc` variants, and use the taint analysis in `src/analysis/taint.rs` to decide whether inputs are user-controlled. Read a sibling detector (e.g. `controlled_library_call.rs` / `controlled_replace_class.rs`) before writing a new one.

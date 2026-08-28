@@ -98,6 +98,10 @@ Num | Detector | What it Detects | Impact | Confidence | Cairo
 12 | `reentrancy-events` | Detect when an event is emitted after an external call leading to out-of-order events | Low | Medium | 1 & 2
 13 | `dead-code` | Private functions never used | Low | Medium | 1 & 2
 14 | `use-after-pop-front` | Detect use of an array or a span after removing element(s) | Low | Medium | 1 & 2
+15 | `controlled-deploy` | Deploy syscall with a user controlled class hash | High | Medium | 2
+16 | `unchecked-transfer` | ERC20 transfer/transfer_from calls whose returned bool is ignored | High | Medium | 2
+17 | `unprotected-replace-class` | replace_class_syscall reachable from an external function without a caller address check | High | Low | 2
+18 | `controlled-l1-message` | send_message_to_l1_syscall with a user controlled to_address | Medium | Medium | 2
 
 The Cairo column represent the compiler version(s) for which the detector is valid.
 

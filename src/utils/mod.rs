@@ -42,7 +42,6 @@ pub fn filter_builtins_from_arguments(
 }
 
 /// Filter the builtins from the return variables and returns only the user defined variables
-#[allow(dead_code)]
 pub fn filter_builtins_from_returns(
     signature: &[OutputVarInfo],
     returns: Vec<VarId>,
@@ -55,6 +54,28 @@ pub fn filter_builtins_from_returns(
         })
         .map(|(_, arg_elem)| arg_elem)
         .collect()
+}
+
+/// Skip leading statements that are pure bookkeeping — they don't consume or
+/// produce the data values the dropped-return detectors track — so they can't
+/// affect whether a return value is used. The compiler freely interleaves
+/// these with the drop/deconstruct sequence those detectors pattern-match
+/// (e.g. a `disable_ap_tracking` between the `branch_align` and the `drop`,
+/// or a `redeposit_gas` right after a `branch_align` on cairo >= 2.6).
+pub fn skip_bookkeeping(mut stmts: &[SierraStatement]) -> &[SierraStatement] {
+    while let Some(SierraStatement::Invocation(invoc)) = stmts.first() {
+        let is_bookkeeping = invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
+            n == "branch_align"
+                || n == "disable_ap_tracking"
+                || n == "enable_ap_tracking"
+                || n == "redeposit_gas"
+        });
+        if !is_bookkeeping {
+            break;
+        }
+        stmts = &stmts[1..];
+    }
+    stmts
 }
 
 /// Trace a sierra variable within a function's statements back to the

@@ -4,7 +4,9 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Type;
-use crate::utils::{statement_summary_in_function, statement_summary_in_named_function};
+use crate::utils::{
+    skip_bookkeeping, statement_summary_in_function, statement_summary_in_named_function,
+};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::enm::EnumConcreteLibfunc;
 use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
@@ -23,28 +25,6 @@ use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement, Sta
 // return values would be noise about compiler plumbing, not user intent.
 #[derive(Default)]
 pub struct UnusedReturn;
-
-/// Skip leading statements that are pure bookkeeping — they don't consume or
-/// produce the data values this detector tracks — so they can't affect
-/// whether a return value is used. The compiler freely interleaves these
-/// with the drop/deconstruct sequence this detector pattern-matches (e.g. a
-/// `disable_ap_tracking` between the `branch_align` and the `drop`, or a
-/// `redeposit_gas` right after a `branch_align` on cairo >= 2.6).
-fn skip_bookkeeping(mut stmts: &[SierraStatement]) -> &[SierraStatement] {
-    while let Some(SierraStatement::Invocation(invoc)) = stmts.first() {
-        let is_bookkeeping = invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
-            n == "branch_align"
-                || n == "disable_ap_tracking"
-                || n == "enable_ap_tracking"
-                || n == "redeposit_gas"
-        });
-        if !is_bookkeeping {
-            break;
-        }
-        stmts = &stmts[1..];
-    }
-    stmts
-}
 
 impl Detector for UnusedReturn {
     fn name(&self) -> &str {
