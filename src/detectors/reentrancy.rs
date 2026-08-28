@@ -4,7 +4,7 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::{is_safe_external_call, reentrancy_pairing_identity};
+use crate::utils::{is_safe_external_call, storage_variable_identity};
 
 #[derive(Default)]
 pub struct Reentrancy;
@@ -39,10 +39,8 @@ impl Detector for Reentrancy {
                     } = bb_info.1
                     {
                         for call in reentrancy_info.external_calls.iter() {
-                            let external_function_call = format!(
-                                "{}",
-                                call.get_function_call().unwrap().get_statement()
-                            );
+                            let external_function_call =
+                                format!("{}", call.get_function_call().unwrap().get_statement());
 
                             if is_safe_external_call(call, f.get_statements(), core) {
                                 continue;
@@ -57,7 +55,9 @@ impl Detector for Reentrancy {
                                     .1
                                     .iter()
                                     .map(|var| {
-                                        reentrancy_pairing_identity(
+                                        storage_variable_identity(
+                                            compilation_unit,
+                                            var.get_function(),
                                             var.get_storage_variable_read()
                                                 .as_ref()
                                                 .unwrap()
@@ -68,14 +68,25 @@ impl Detector for Reentrancy {
                                 for written_variable in
                                     reentrancy_info.storage_variables_written.iter()
                                 {
-                                    let written_variable_name = reentrancy_pairing_identity(
+                                    let written_variable_name = storage_variable_identity(
+                                        compilation_unit,
+                                        written_variable.get_function(),
                                         written_variable
                                             .get_storage_variable_written()
                                             .as_ref()
                                             .unwrap()
                                             .get_statement(),
                                     );
-                                    if vars_read.contains(&written_variable_name) {
+                                    // Precise match when both identities are
+                                    // known; wildcard when either side is
+                                    // unknown (prefer over-reporting to losing
+                                    // the finding).
+                                    let read_before_call = vars_read.iter().any(|read| {
+                                        read.is_empty()
+                                            || written_variable_name.is_empty()
+                                            || *read == written_variable_name
+                                    });
+                                    if read_before_call {
                                         results.insert(Result {
                                             name: self.name().to_string(),
                                             impact: self.impact(),

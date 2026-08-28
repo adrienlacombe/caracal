@@ -1,4 +1,5 @@
 use crate::core::basic_block::BasicBlock;
+use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use cairo_lang_sierra::extensions::lib_func::{OutputVarInfo, ParamSignature};
 use cairo_lang_sierra::ids::VarId;
@@ -234,25 +235,22 @@ pub fn storage_statement_identity(
         .map(|(p, _)| p.to_string())
 }
 
-/// Pairing key used by the reentrancy/reentrancy-benign detectors to decide
-/// whether a read and a write touch the same storage variable. For the
-/// pre-2.6 per-variable accessor form the key is the function path minus the
-/// trailing `::read`/`::write` segment. The raw-syscall form (inlined cairo
-/// 2.11+ sierra) and the generic corelib accessor form (inlining avoided)
-/// don't carry the variable name in a way a read and a write share, so they
-/// map to the empty string — a wildcard that matches any variable, which is
-/// the historical behavior for those shapes.
-pub fn reentrancy_pairing_identity(stmt: &SierraStatement) -> String {
-    if let SierraStatement::Invocation(invoc) = stmt {
-        if let Some(name) = invoc.libfunc_id.debug_name.as_ref() {
-            if name.starts_with("function_call<user@core::starknet::storage") {
-                return String::new();
-            }
-        }
-    }
-    format!("{stmt}")
-        .rsplit_once("::")
-        .map(|(p, _)| p.to_string())
+/// Identity of the storage variable a read/write statement touches, computed
+/// against the statements of the function that owns the statement — reads
+/// and writes can be recorded in a different function than the one under
+/// analysis (through the reentrancy analysis' private-call recursion), and
+/// the `struct_deconstruct` the identity is traced from lives in the owner.
+/// Returns an empty string when the identity cannot be determined; callers
+/// treat that as a wildcard that matches any variable rather than dropping
+/// the finding.
+pub fn storage_variable_identity(
+    compilation_unit: &CompilationUnit,
+    owner: &str,
+    stmt: &SierraStatement,
+) -> String {
+    compilation_unit
+        .function_by_name(owner)
+        .and_then(|f| storage_statement_identity(stmt, f.get_statements()))
         .unwrap_or_default()
 }
 
