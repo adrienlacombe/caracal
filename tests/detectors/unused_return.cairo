@@ -78,34 +78,41 @@ mod UnusedReturn {
         a
     }
 
+    #[inline(never)]
     fn f_1(ref self: ContractState, amount: felt252) -> felt252 {
         self.value.write(amount);
         23
     }
 
+    #[inline(never)]
     fn f_2(amount: felt252) -> (felt252, felt252, felt252) {
         (amount, amount, amount)
     }
 
+    #[inline(never)]
     fn f_3(amount: felt252) -> felt252 {
         amount
     }
 
+    #[inline(never)]
     fn f_4(amount: felt252) -> Option::<felt252> {
         Option::Some(amount)
     }
 
+    #[inline(never)]
     fn f_5(ref self: ContractState) -> felt252 {
         let a = self.value.read();
         a * 2
     }
 
+    #[inline(never)]
     fn f_6(ref self:ContractState, amount1: felt252, amount2: felt252) -> felt252 {
         let a = self.value.read();
         let ret = amount1 * amount2;
         ret + a
     }
 
+    #[inline(never)]
     fn f_7(ref self:ContractState, s:TestStruct) -> felt252 {
         let a = self.value.read();
         s.val1 * s.val2 * s.val3 + a

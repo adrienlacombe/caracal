@@ -10,8 +10,35 @@ use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
 use cairo_lang_sierra::extensions::ConcreteType;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement, StatementIdx};
 
+// Scope on cairo >= 2.6: this detector inspects `function_call` statements,
+// so it only sees calls that survive the compiler's inlining. Small private
+// functions — the typical "called and result ignored" case — are inlined into
+// the `__wrapper__*` entrypoint and the unused computation is then deleted
+// outright, leaving no trace in sierra to detect. The detector still works
+// (and is tested) on calls the inliner keeps as real call boundaries:
+// `#[inline(never)]` functions, and functions the inliner rejects (recursive
+// or large bodies). Restoring coverage of the inlined case is not possible at
+// the sierra level — the information no longer exists.
 #[derive(Default)]
 pub struct UnusedReturn;
+
+/// Skip leading statements that are pure bookkeeping — no data arguments, no
+/// results — so they can't affect whether a return value is used. The
+/// compiler freely interleaves these with the drop/deconstruct sequence this
+/// detector pattern-matches (e.g. a `disable_ap_tracking` between the
+/// `branch_align` and the `drop` on cairo >= 2.6).
+fn skip_bookkeeping(mut stmts: &[SierraStatement]) -> &[SierraStatement] {
+    while let Some(SierraStatement::Invocation(invoc)) = stmts.first() {
+        let is_bookkeeping = invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
+            n == "branch_align" || n == "disable_ap_tracking" || n == "enable_ap_tracking"
+        });
+        if !is_bookkeeping {
+            break;
+        }
+        stmts = &stmts[1..];
+    }
+    stmts
+}
 
 impl Detector for UnusedReturn {
     fn name(&self) -> &str {
@@ -79,7 +106,7 @@ impl Detector for UnusedReturn {
                                 continue;
                             }
 
-                            let following_stmts = f.get_statements_at(i + 1);
+                            let following_stmts = skip_bookkeeping(f.get_statements_at(i + 1));
                             if let SierraStatement::Invocation(invoc) = &following_stmts[0] {
                                 let mut libfunc = compilation_unit
                                     .registry()
@@ -114,7 +141,7 @@ impl Detector for UnusedReturn {
                                     let return_variables = invoc.branches[0].results.len();
 
                                     // Go to the next statement and update the libfunc
-                                    let stmt_to_check = &following_stmts[1..];
+                                    let stmt_to_check = skip_bookkeeping(&following_stmts[1..]);
                                     if let SierraStatement::Invocation(invoc) = &stmt_to_check[0] {
                                         libfunc = compilation_unit
                                             .registry()
@@ -138,8 +165,11 @@ impl Detector for UnusedReturn {
                                 ) = libfunc
                                 {
                                     let return_variables = invoc.branches[0].results.len();
-                                    // Jump one statement which is a branch_align and the next one will be a struct_deconstruct
-                                    let stmt_to_check = &following_stmts[2..];
+                                    // Skip the branch_align (and any ap-tracking
+                                    // toggles) after the enum_match; the next
+                                    // data statement is a struct_deconstruct or
+                                    // a drop of the whole payload
+                                    let stmt_to_check = skip_bookkeeping(&following_stmts[1..]);
                                     if let SierraStatement::Invocation(invoc) = &stmt_to_check[0] {
                                         libfunc = compilation_unit
                                             .registry()
@@ -194,7 +224,7 @@ impl<'a> UnusedReturn {
 
                 return_variables_counter += 1;
 
-                stmt_to_check = &stmt_to_check[1..];
+                stmt_to_check = skip_bookkeeping(&stmt_to_check[1..]);
             } else {
                 break;
             }
