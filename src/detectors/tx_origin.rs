@@ -137,6 +137,33 @@ impl TxOrigin {
                             invoc.args.clone(),
                             &function.name(),
                         ),
+                    // With inlining avoided (cairo >= 2.6) an address
+                    // comparison is a call into a corelib PartialEq impl
+                    // (e.g. ContractAddressPartialEq::eq) instead of the raw
+                    // felt252_is_zero the impl performs internally.
+                    CoreConcreteLibfunc::FunctionCall(f_called) => {
+                        let callee = f_called
+                            .function
+                            .id
+                            .debug_name
+                            .as_ref()
+                            .map(|n| n.as_str())
+                            .unwrap_or_default();
+                        if callee.starts_with("core::")
+                            && (callee.ends_with("PartialEq::eq")
+                                || callee.ends_with("PartialEq::ne"))
+                        {
+                            let taint = compilation_unit.get_taint(&function.name()).unwrap();
+                            invoc.args.iter().any(|arg| {
+                                taint.taints_any_sources(
+                                    tx_origin_tainted_args,
+                                    &WrapperVariable::new(function.name(), arg.id),
+                                )
+                            })
+                        } else {
+                            false
+                        }
+                    }
                     _ => false,
                 }
             });

@@ -197,7 +197,14 @@ impl BasicBlock {
                                     }
                                 }
                                 Type::Event => self.event_emitted = Some(instruction.clone()),
-                                Type::Private => self.private_call = Some(instruction.clone()),
+                                // Loop functions are compiler-generated out of
+                                // the user function's own body; treat calling
+                                // one like a private call so interprocedural
+                                // walks (e.g. the reentrancy analysis
+                                // recursion) descend into it.
+                                Type::Private | Type::Loop => {
+                                    self.private_call = Some(instruction.clone())
+                                }
                                 Type::AbiCallContract => {
                                     self.external_call = Some(instruction.clone())
                                 }

@@ -4,7 +4,7 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::is_safe_syscall;
+use crate::utils::is_safe_external_call;
 
 #[derive(Default)]
 pub struct ReentrancyEvents;
@@ -45,10 +45,8 @@ impl Detector for ReentrancyEvents {
                                     call.get_function_call().unwrap().get_statement()
                                 );
 
-                                if let Some(safe_selectors) = core.get_safe_external_selectors() {
-                                    if is_safe_syscall(call, f.get_statements(), safe_selectors) {
-                                        continue;
-                                    }
+                                if is_safe_external_call(call, f.get_statements(), core) {
+                                    continue;
                                 }
 
                                 results.insert(Result {

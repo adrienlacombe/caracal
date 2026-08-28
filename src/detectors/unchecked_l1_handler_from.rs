@@ -42,16 +42,23 @@ impl Detector for UncheckedL1HandlerFrom {
             for f in l1_handler_funcs {
                 let mut sources = FxHashSet::default();
                 if f.name().contains("::__wrapper__") {
-                    // Since cairo 2.6 the handler body is inlined into a
+                    // Since cairo 2.6 the handler entrypoint is a
                     // `__wrapper__*` whose only data parameter is the raw
                     // `Span<felt252>` calldata; `from_address` no longer
                     // exists as a parameter. The OS prepends it to the
                     // calldata, and deserialization runs before any user
-                    // code, so the first `array_snapshot_pop_front<felt252>`
-                    // of the wrapper pops exactly `from_address` — seed the
-                    // taint source with the popped box (the taint map flows
-                    // it through `unbox` and the stores on its own).
-                    let box_var = f.get_statements().iter().find_map(|stmt| match stmt {
+                    // code, so the first deserialization of the wrapper pops
+                    // exactly `from_address`. Two shapes exist:
+                    // - inlining avoided (caracal's own compilation): a call
+                    //   to `core::Felt252Serde::deserialize` whose 2nd result
+                    //   is the deserialized `Option<felt252>` — seed with it
+                    //   (the taint flows through the enum_match and into the
+                    //   call to the user's handler function).
+                    // - inlined sierra (e.g. scarb artifacts): a raw
+                    //   `array_snapshot_pop_front<felt252>` — seed with the
+                    //   popped box (the taint map flows it through `unbox`
+                    //   and the stores on its own).
+                    let from_var = f.get_statements().iter().find_map(|stmt| match stmt {
                         SierraStatement::Invocation(invoc)
                             if invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
                                 n.starts_with("array_snapshot_pop_front<felt252>")
@@ -63,12 +70,23 @@ impl Detector for UncheckedL1HandlerFrom {
                                 .and_then(|b| b.results.get(1))
                                 .map(|v| v.id)
                         }
+                        SierraStatement::Invocation(invoc)
+                            if invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
+                                n == "function_call<user@core::Felt252Serde::deserialize>"
+                            }) =>
+                        {
+                            invoc
+                                .branches
+                                .first()
+                                .and_then(|b| b.results.get(1))
+                                .map(|v| v.id)
+                        }
                         _ => None,
                     });
-                    let Some(box_var) = box_var else {
+                    let Some(from_var) = from_var else {
                         continue;
                     };
-                    sources.insert(WrapperVariable::new(f.name(), box_var));
+                    sources.insert(WrapperVariable::new(f.name(), from_var));
                 } else {
                     // Pre-2.6 shape: the handler is its own function with the
                     // signature (self: @ContractState, from_address, ...) and
@@ -139,6 +157,32 @@ impl UncheckedL1HandlerFrom {
                             compilation_unit,
                             &function.name(),
                         ),
+                    // With inlining avoided (cairo >= 2.6) an equality check
+                    // is a call into a corelib PartialEq impl instead of the
+                    // raw felt252_is_zero the impl performs internally.
+                    CoreConcreteLibfunc::FunctionCall(f_called) => {
+                        let callee = f_called
+                            .function
+                            .id
+                            .debug_name
+                            .as_ref()
+                            .map(|n| n.as_str())
+                            .unwrap_or_default();
+                        if callee.starts_with("core::")
+                            && (callee.ends_with("PartialEq::eq")
+                                || callee.ends_with("PartialEq::ne"))
+                        {
+                            let taint = compilation_unit.get_taint(&function.name()).unwrap();
+                            invoc.args.iter().any(|arg| {
+                                taint.taints_any_sources(
+                                    from_tainted_args,
+                                    &WrapperVariable::new(function.name(), arg.id),
+                                )
+                            })
+                        } else {
+                            false
+                        }
+                    }
                     _ => false,
                 }
             });

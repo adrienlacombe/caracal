@@ -96,6 +96,39 @@ impl Detector for UseAfterPopFront {
                                     WrapperVariable::new(function.name(), invoc.args[0].id),
                                     CollectionType::Span,
                                 )),
+                                // With inlining avoided (cairo >= 2.6) the pops
+                                // are calls into the corelib array/span impls
+                                // instead of raw array libfuncs. The collection
+                                // is the only data argument (`ref self`).
+                                CoreConcreteLibfunc::FunctionCall(f_called) => {
+                                    let callee = f_called
+                                        .function
+                                        .id
+                                        .debug_name
+                                        .as_ref()
+                                        .map(|n| n.as_str())
+                                        .unwrap_or_default();
+                                    if callee.starts_with("core::array::ArrayImpl::")
+                                        && callee.ends_with("::pop_front")
+                                    {
+                                        Some((
+                                            index,
+                                            WrapperVariable::new(function.name(), invoc.args[0].id),
+                                            CollectionType::Array,
+                                        ))
+                                    } else if callee.starts_with("core::array::SpanImpl::")
+                                        && (callee.ends_with("::pop_front")
+                                            || callee.ends_with("::pop_back"))
+                                    {
+                                        Some((
+                                            index,
+                                            WrapperVariable::new(function.name(), invoc.args[0].id),
+                                            CollectionType::Span,
+                                        ))
+                                    } else {
+                                        None
+                                    }
+                                }
                                 _ => None,
                             }
                         }
@@ -188,9 +221,12 @@ impl UseAfterPopFront {
         bad_array: &WrapperVariable,
         pop_stmt_index: usize,
     ) -> bool {
-        // Check the remaining statements of the function
+        // Check the remaining statements of the function. Start after the pop
+        // statement itself: when the pop is a corelib FunctionCall it would
+        // otherwise match the FunctionCall arm of `check_statements` and
+        // count as its own "use".
         let bad_array_used_in_function =
-            self.check_statements(compilation_unit, function, bad_array, pop_stmt_index);
+            self.check_statements(compilation_unit, function, bad_array, pop_stmt_index + 1);
 
         // Check if the bad array is sent to any function being called from this function
         let bad_array_used_in_calls = bad_array_used_in_function
@@ -411,25 +447,15 @@ impl UseAfterPopFront {
     ) -> bool {
         let taint = compilation_unit.get_taint(&function.name()).unwrap();
 
-        let return_array_indices: Vec<usize> = function
+        // With inlining avoided the user function returns its value wrapped
+        // in `PanicResult<(ContractState?, T)>`, so unwrap enums/structs when
+        // looking for a returned array or span.
+        let returns_array = function
             .returns_all()
-            .enumerate()
-            .flat_map(|(i, r)| {
-                let return_type = compilation_unit
-                    .registry()
-                    .get_type(r)
-                    .expect("Type not found in the registry");
-
-                match return_type {
-                    CoreTypeConcrete::Array(_) => Some(i),
-                    span if self.is_core_type_concrete_span(compilation_unit, span) => Some(i),
-                    _ => None,
-                }
-            })
-            .collect();
+            .any(|r| self.type_contains_array_or_span(compilation_unit, r, 0));
 
         // Not returning any array
-        if return_array_indices.is_empty() {
+        if !returns_array {
             return false;
         }
 
@@ -453,6 +479,51 @@ impl UseAfterPopFront {
             .collect();
 
         !returned_bad_arrays.is_empty()
+    }
+
+    // Return true if the type is an array/span or (recursively) contains one,
+    // unwrapping the PanicResult enum and tuple structs the compiler wraps
+    // return values in when the function call is not inlined. Only the
+    // success variant of PanicResult is considered — its error variant always
+    // carries the `Array<felt252>` panic data and would match every function.
+    fn type_contains_array_or_span(
+        &self,
+        compilation_unit: &CompilationUnit,
+        ty_id: &cairo_lang_sierra::ids::ConcreteTypeId,
+        depth: usize,
+    ) -> bool {
+        if depth > 4 {
+            return false;
+        }
+        let ty = compilation_unit
+            .registry()
+            .get_type(ty_id)
+            .expect("Type not found in the registry");
+        match ty {
+            CoreTypeConcrete::Array(_) => true,
+            span if self.is_core_type_concrete_span(compilation_unit, span) => true,
+            CoreTypeConcrete::Struct(struct_type) => struct_type
+                .members
+                .iter()
+                .any(|m| self.type_contains_array_or_span(compilation_unit, m, depth + 1)),
+            CoreTypeConcrete::Enum(enum_type) => {
+                let is_panic_result = ty_id
+                    .debug_name
+                    .as_ref()
+                    .is_some_and(|n| n.starts_with("core::panics::PanicResult"));
+                if is_panic_result {
+                    enum_type.variants.first().is_some_and(|v| {
+                        self.type_contains_array_or_span(compilation_unit, v, depth + 1)
+                    })
+                } else {
+                    enum_type
+                        .variants
+                        .iter()
+                        .any(|v| self.type_contains_array_or_span(compilation_unit, v, depth + 1))
+                }
+            }
+            _ => false,
+        }
     }
 
     // The Span is not a Core Sierra type, it is defined in the corelib as a Struct

@@ -4,7 +4,7 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::is_safe_syscall;
+use crate::utils::{is_safe_external_call, reentrancy_pairing_identity};
 
 #[derive(Default)]
 pub struct Reentrancy;
@@ -44,10 +44,8 @@ impl Detector for Reentrancy {
                                 call.get_function_call().unwrap().get_statement()
                             );
 
-                            if let Some(safe_selectors) = core.get_safe_external_selectors() {
-                                if is_safe_syscall(call, f.get_statements(), safe_selectors) {
-                                    continue;
-                                }
+                            if is_safe_external_call(call, f.get_statements(), core) {
+                                continue;
                             }
 
                             if let Some(current_vars_read_before_call) = reentrancy_info
@@ -59,28 +57,24 @@ impl Detector for Reentrancy {
                                     .1
                                     .iter()
                                     .map(|var| {
-                                        var.get_storage_variable_read()
-                                            .as_ref()
-                                            .unwrap()
-                                            .get_statement()
-                                            .to_string()
-                                            .rsplit_once("::")
-                                            .map(|(p, _)| p.to_string())
-                                            .unwrap_or_default()
+                                        reentrancy_pairing_identity(
+                                            var.get_storage_variable_read()
+                                                .as_ref()
+                                                .unwrap()
+                                                .get_statement(),
+                                        )
                                     })
                                     .collect();
                                 for written_variable in
                                     reentrancy_info.storage_variables_written.iter()
                                 {
-                                    let written_variable_name = written_variable
-                                        .get_storage_variable_written()
-                                        .as_ref()
-                                        .unwrap()
-                                        .get_statement()
-                                        .to_string()
-                                        .rsplit_once("::")
-                                        .map(|(p, _)| p.to_string())
-                                        .unwrap_or_default();
+                                    let written_variable_name = reentrancy_pairing_identity(
+                                        written_variable
+                                            .get_storage_variable_written()
+                                            .as_ref()
+                                            .unwrap()
+                                            .get_statement(),
+                                    );
                                     if vars_read.contains(&written_variable_name) {
                                         results.insert(Result {
                                             name: self.name().to_string(),

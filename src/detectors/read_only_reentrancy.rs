@@ -2,8 +2,9 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
+use crate::core::function::Function;
 use crate::core::function::Type;
-use crate::utils::{is_safe_syscall, storage_statement_identity};
+use crate::utils::{is_safe_external_call, storage_statement_identity};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -39,15 +40,17 @@ impl Detector for ReadOnlyReentrancy {
                 .functions_user_defined()
                 .filter(|f| f.ty() == &Type::View)
             {
-                for storage_var_read in f.storage_vars_read() {
-                    // Empty string when the variable couldn't be identified —
-                    // treated as a wildcard match below rather than dropping
-                    // the read on the floor.
-                    let var_read = storage_statement_identity(storage_var_read, f.get_statements())
-                        .unwrap_or_default();
-                    let functions_name = vars_read.entry(var_read).or_default();
-                    functions_name.insert(f.name());
-                }
+                // With inlining avoided the view entrypoint is a `__wrapper__*`
+                // whose reads happen in the Private user function it calls, so
+                // collect reads transitively through user-defined callees.
+                let mut visited: HashSet<String> = HashSet::new();
+                Self::collect_view_reads(
+                    compilation_unit,
+                    f,
+                    &f.name(),
+                    &mut vars_read,
+                    &mut visited,
+                );
             }
 
             for f in compilation_unit.functions_user_defined() {
@@ -61,10 +64,8 @@ impl Detector for ReadOnlyReentrancy {
                             let external_function_call =
                                 format!("{}", call.get_function_call().unwrap().get_statement());
 
-                            if let Some(safe_selectors) = core.get_safe_external_selectors() {
-                                if is_safe_syscall(call, f.get_statements(), safe_selectors) {
-                                    continue;
-                                }
+                            if is_safe_external_call(call, f.get_statements(), core) {
+                                continue;
                             }
 
                             for written_variable in reentrancy_info.storage_variables_written.iter()
@@ -127,5 +128,58 @@ impl Detector for ReadOnlyReentrancy {
         }
 
         results
+    }
+}
+
+impl ReadOnlyReentrancy {
+    /// Record the storage variables read by `current` (attributed to the view
+    /// entrypoint `view_name`), then recurse into the user-defined functions
+    /// it calls. Identities are computed against the owning function's
+    /// statements; an empty string means the variable couldn't be identified
+    /// and is treated as a wildcard match rather than dropping the read.
+    fn collect_view_reads(
+        compilation_unit: &crate::core::compilation_unit::CompilationUnit,
+        current: &Function,
+        view_name: &str,
+        vars_read: &mut HashMap<String, HashSet<String>>,
+        visited: &mut HashSet<String>,
+    ) {
+        if !visited.insert(current.name()) {
+            return;
+        }
+
+        for storage_var_read in current.storage_vars_read() {
+            let var_read = storage_statement_identity(storage_var_read, current.get_statements())
+                .unwrap_or_default();
+            vars_read
+                .entry(var_read)
+                .or_default()
+                .insert(view_name.to_string());
+        }
+
+        for call in current
+            .private_functions_calls()
+            .chain(current.loop_functions_calls())
+        {
+            if let cairo_lang_sierra::program::GenStatement::Invocation(invoc) = call {
+                if let Some(callee) = invoc
+                    .libfunc_id
+                    .debug_name
+                    .as_ref()
+                    .and_then(|n| n.strip_prefix("function_call<user@"))
+                    .and_then(|n| n.strip_suffix('>'))
+                {
+                    if let Some(callee_function) = compilation_unit.function_by_name(callee) {
+                        Self::collect_view_reads(
+                            compilation_unit,
+                            callee_function,
+                            view_name,
+                            vars_read,
+                            visited,
+                        );
+                    }
+                }
+            }
+        }
     }
 }

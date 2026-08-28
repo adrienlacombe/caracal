@@ -5,18 +5,17 @@ use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::program::Statement as SierraStatement;
 use std::collections::HashSet;
 
-// Historical context: this detector looked for a `Drop<T>` libfunc as the very
-// first invocation of a user function — the compiler's old way of signalling
-// "this formal parameter was never read". Since cairo 2.6 entrypoints are
-// inlined into a compiler-generated `__wrapper__*` whose only non-builtin
-// parameter is a `Span<felt252>` of raw calldata. The user's declared
-// arguments (`a`, `b`, …) no longer exist as first-class sierra params; they
-// are synthesized by the inlined `Serde::deserialize` loop, and their unused-
-// ness is not observable from the `Drop` position anymore. The detector
-// therefore currently reports nothing on modern cairo; restoring it would
-// require parsing the ABI and tracking which deserialized calldata slots are
-// actually consumed. Left in place so the behaviour is deliberate rather than
-// accidentally removed.
+// This detector looks for `Drop<T>` libfuncs as the leading invocations of a
+// user function — the compiler's way of signalling "this formal parameter was
+// never read". It requires the user function to exist as its own sierra
+// function with its declared parameters. Caracal compiles with inlining
+// avoided, which keeps entrypoint bodies as separate Private functions called
+// from the `__wrapper__*`, so the detector works again on cairo >= 2.6 (it
+// had been inert between commit 61488ce and the inlining-avoid change: the
+// inlined wrapper's only data parameter was the raw `Span<felt252>` calldata
+// and the unused-ness of the deserialized arguments was not observable from
+// the `Drop` position). It remains inert on sierra produced with default
+// inlining, e.g. pre-built scarb artifacts.
 #[derive(Default)]
 pub struct UnusedArguments {}
 

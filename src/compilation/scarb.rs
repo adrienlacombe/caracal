@@ -10,6 +10,10 @@ use crate::core::core_unit::CoreOpts;
 use cairo_lang_sierra_generator::replace_ids::SierraIdReplacer;
 use cairo_lang_starknet_classes::contract_class::ContractClass;
 
+// NOTE: this path consumes the sierra artifacts scarb produces, so caracal
+// cannot control the inlining strategy here. Scarb users get the best
+// analysis results by setting `inlining-strategy = "avoid"` in the `[cairo]`
+// section of their profile (alongside `sierra-replace-ids = true`).
 pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     process::Command::new("scarb")
         .current_dir(opts.target.as_path())

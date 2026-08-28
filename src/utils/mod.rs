@@ -1,4 +1,5 @@
 use crate::core::basic_block::BasicBlock;
+use crate::core::core_unit::CoreUnit;
 use cairo_lang_sierra::extensions::lib_func::{OutputVarInfo, ParamSignature};
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
@@ -148,13 +149,66 @@ pub fn trace_storage_base_address(
     None
 }
 
+/// Trace a sierra variable holding a storage-base struct back to the
+/// `struct_deconstruct<...::StorageStorageBase(Mut)?>` that produced it, if
+/// any. With inlining avoided (cairo >= 2.6) each storage variable is one
+/// member of the contract's storage-base struct, so the (struct, member
+/// index) pair identifies the variable. The `Mut` suffix is stripped so a
+/// read through `StorageStorageBase` pairs with a write through
+/// `StorageStorageBaseMut`.
+pub fn trace_storage_base_member(
+    statements: &[SierraStatement],
+    mut var_id: u64,
+) -> Option<String> {
+    for _ in 0..256 {
+        let producer = statements.iter().find_map(|stmt| match stmt {
+            SierraStatement::Invocation(invoc)
+                if invoc
+                    .branches
+                    .iter()
+                    .any(|b| b.results.iter().any(|r| r.id == var_id)) =>
+            {
+                Some(invoc)
+            }
+            _ => None,
+        })?;
+        let name = producer.libfunc_id.debug_name.as_ref()?.as_str();
+        if let Some(rest) = name.strip_prefix("struct_deconstruct<") {
+            let ty = rest.strip_suffix('>')?;
+            if !ty.contains("StorageStorageBase") {
+                return None;
+            }
+            let member_index = producer
+                .branches
+                .first()?
+                .results
+                .iter()
+                .position(|r| r.id == var_id)?;
+            return Some(format!("{}#{}", ty.trim_end_matches("Mut"), member_index));
+        }
+        let forwards = name.starts_with("snapshot_take<")
+            || name.starts_with("store_temp<")
+            || name.starts_with("rename<")
+            || name.starts_with("dup<");
+        if forwards {
+            var_id = producer.args.first()?.id;
+            continue;
+        }
+        return None;
+    }
+    None
+}
+
 /// Identity of the storage variable a read/write statement touches, used to
 /// pair reads and writes of the same variable across functions. For the
-/// pre-inlining `FunctionCall` form the identity is the function path minus
-/// its trailing `::read`/`::write`; for the raw syscall form (cairo 2.11+)
-/// it is the traced `storage_base_address_const` value (the 4th syscall
-/// argument is the storage address for both read and write). Returns `None`
-/// when the identity cannot be determined.
+/// corelib accessor form (inlining avoided, cairo >= 2.6) the callee name is
+/// generic over the stored type, so the identity is the traced storage-base
+/// struct member; for the pre-2.6 `FunctionCall` form the identity is the
+/// function path minus its trailing `::read`/`::write`; for the raw syscall
+/// form (inlined cairo 2.11+ sierra) it is the traced
+/// `storage_base_address_const` value (the 4th syscall argument is the
+/// storage address for both read and write). Returns `None` when the
+/// identity cannot be determined.
 pub fn storage_statement_identity(
     stmt: &SierraStatement,
     function_statements: &[SierraStatement],
@@ -166,25 +220,77 @@ pub fn storage_statement_identity(
             return trace_storage_base_address(function_statements, address_var.id)
                 .map(|n| n.to_string());
         }
+        if name.starts_with("function_call<user@core::starknet::storage") {
+            // The storage-base struct is one of the call arguments (after the
+            // implicit builtins); trace each until one resolves.
+            return invoc
+                .args
+                .iter()
+                .find_map(|arg| trace_storage_base_member(function_statements, arg.id));
+        }
     }
     format!("{stmt}")
         .rsplit_once("::")
         .map(|(p, _)| p.to_string())
 }
 
+/// Pairing key used by the reentrancy/reentrancy-benign detectors to decide
+/// whether a read and a write touch the same storage variable. For the
+/// pre-2.6 per-variable accessor form the key is the function path minus the
+/// trailing `::read`/`::write` segment. The raw-syscall form (inlined cairo
+/// 2.11+ sierra) and the generic corelib accessor form (inlining avoided)
+/// don't carry the variable name in a way a read and a write share, so they
+/// map to the empty string — a wildcard that matches any variable, which is
+/// the historical behavior for those shapes.
+pub fn reentrancy_pairing_identity(stmt: &SierraStatement) -> String {
+    if let SierraStatement::Invocation(invoc) = stmt {
+        if let Some(name) = invoc.libfunc_id.debug_name.as_ref() {
+            if name.starts_with("function_call<user@core::starknet::storage") {
+                return String::new();
+            }
+        }
+    }
+    format!("{stmt}")
+        .rsplit_once("::")
+        .map(|(p, _)| p.to_string())
+        .unwrap_or_default()
+}
+
 /// Return true if the external call inside this basic block targets one of
-/// the allowlisted safe selectors. Matches `call_contract_syscall` and
-/// `library_call_syscall`: their 4th argument is the `felt252` selector of
-/// the called entrypoint.
-pub fn is_safe_syscall(
+/// the allowlisted safe external calls. Two shapes are handled:
+/// - dispatcher `FunctionCall` statements (inlining avoided, or pre-2.11
+///   sierra): matched by name against the configured safe external calls
+///   (e.g. `::safe_foo` matches `...IAnotherContractDispatcherImpl::safe_foo`)
+/// - raw `call_contract_syscall` / `library_call_syscall` (inlined cairo
+///   2.11+ sierra): their 4th argument is the `felt252` selector of the
+///   called entrypoint, matched against the selectors' `starknet_keccak`.
+pub fn is_safe_external_call(
     call: &BasicBlock,
     function_statements: &[SierraStatement],
-    safe_selectors: &[BigInt],
+    core: &CoreUnit,
 ) -> bool {
     let Some(instr) = call.get_function_call() else {
         return false;
     };
     let GenStatement::Invocation(invoc) = instr.get_statement() else {
+        return false;
+    };
+    let libfunc_name = invoc
+        .libfunc_id
+        .debug_name
+        .as_ref()
+        .map(|n| n.as_str())
+        .unwrap_or_default();
+    if let Some(callee) = libfunc_name
+        .strip_prefix("function_call<user@")
+        .and_then(|n| n.strip_suffix('>'))
+    {
+        if let Some(safe_calls) = core.get_safe_external_calls() {
+            return safe_calls.iter().any(|safe| callee.contains(safe.as_str()));
+        }
+        return false;
+    }
+    let Some(safe_selectors) = core.get_safe_external_selectors() else {
         return false;
     };
     let Some(selector_var) = invoc.args.get(3) else {

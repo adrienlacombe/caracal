@@ -758,6 +758,7 @@ dependencies = [
  "cairo-lang-compiler",
  "cairo-lang-defs",
  "cairo-lang-filesystem",
+ "cairo-lang-lowering",
  "cairo-lang-parser",
  "cairo-lang-plugins",
  "cairo-lang-semantic",

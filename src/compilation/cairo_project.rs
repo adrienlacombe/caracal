@@ -13,6 +13,8 @@ use cairo_lang_compiler::project::setup_project;
 use cairo_lang_compiler::CompilerConfig;
 use cairo_lang_filesystem::db::init_dev_corelib;
 use cairo_lang_filesystem::ids::CrateInput;
+use cairo_lang_lowering::optimizations::config::Optimizations;
+use cairo_lang_lowering::utils::InliningStrategy;
 use cairo_lang_sierra_generator::replace_ids::SierraIdReplacer;
 use cairo_lang_starknet::compile::compile_prepared_db;
 use cairo_lang_starknet::contract::find_contracts;
@@ -54,6 +56,14 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
 
     let mut db = RootDatabase::builder()
         .with_default_plugin_suite(starknet_plugin_suite())
+        // Since cairo 2.6 the default strategy inlines user functions into the
+        // compiler-generated `__wrapper__*` entrypoints, which erases the named
+        // FunctionCall statements many detectors rely on. Avoid inlining (only
+        // `#[inline(always)]` is still honored) so the analyzed SIERRA keeps
+        // user functions as separate, named functions.
+        .with_optimizations(Optimizations::enabled_with_default_movable_functions(
+            InliningStrategy::Avoid,
+        ))
         .build()?;
     init_dev_corelib(&mut db, corelib);
 
@@ -97,6 +107,9 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     Ok(programs_compiled)
 }
 
+// NOTE: the `starknet-compile` binary does not expose an inlining-strategy
+// flag, so this path compiles with the compiler's default (aggressive)
+// inlining and detectors relying on named user functions may miss findings.
 fn local_compiler(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     let mut compiler_calls: Vec<Output> = vec![];
     if let Some(contract_paths) = opts.contract_path {

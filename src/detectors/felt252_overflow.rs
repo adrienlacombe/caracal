@@ -82,6 +82,36 @@ impl Detector for Felt252Overflow {
                                     )
                                 }
                             }
+                        } else if let CoreConcreteLibfunc::FunctionCall(f_called) = libfunc {
+                            // With inlining avoided (cairo >= 2.6) the felt252
+                            // operators are calls into the corelib impls
+                            // instead of raw felt252_add/sub/mul libfuncs.
+                            let operation = match f_called
+                                .function
+                                .id
+                                .debug_name
+                                .as_ref()
+                                .map(|n| n.as_str())
+                                .unwrap_or_default()
+                            {
+                                "core::Felt252Add::add" => Some(Felt252BinaryOperator::Add),
+                                "core::Felt252Sub::sub" => Some(Felt252BinaryOperator::Sub),
+                                "core::Felt252Mul::mul" => Some(Felt252BinaryOperator::Mul),
+                                "core::Felt252Div::div" => Some(Felt252BinaryOperator::Div),
+                                _ => None,
+                            };
+                            if let Some(operation) = operation {
+                                self.handle_binops(
+                                    &mut results,
+                                    compilation_unit,
+                                    invoc,
+                                    statements,
+                                    index,
+                                    stmt,
+                                    &operation,
+                                    &name,
+                                )
+                            }
                         }
                     }
                 }

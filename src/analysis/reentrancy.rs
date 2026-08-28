@@ -99,11 +99,23 @@ impl Analysis for ReentrancyAnalysis {
             functions,
             registry,
             &mut HashSet::new(),
+            false,
         );
     }
 }
 
 impl ReentrancyAnalysis {
+    /// `in_recursion` is true when the instruction belongs to a callee reached
+    /// through the private-call recursion below rather than to the function
+    /// the engine runs on. The engine's dataflow keeps writes and events
+    /// basic-block-local (the join drops them), so on the analyzed function's
+    /// own CFG a write/event only shows up in a post state that also contains
+    /// a *previous* external call — i.e. only writes/events that happen after
+    /// a call are visible to the detectors. The recursion flattens the
+    /// callee's basic blocks into a single accumulating state, losing that
+    /// ordering; emulate it by recording a write/event only when an external
+    /// call was already seen.
+    #[allow(clippy::too_many_arguments)]
     fn transfer_function_helper(
         basic_block: &BasicBlock,
         state: &mut <ReentrancyAnalysis as Analysis>::Domain,
@@ -111,6 +123,7 @@ impl ReentrancyAnalysis {
         functions: &[Function],
         registry: &ProgramRegistry<CoreType, CoreLibfunc>,
         private_functions_seen: &mut HashSet<String>,
+        in_recursion: bool,
     ) {
         match state {
             ReentrancyDomain::Bottom => {
@@ -133,7 +146,9 @@ impl ReentrancyAnalysis {
                                     .storage_variables_read
                                     .insert(basic_block.clone());
                             }
-                            StarknetConcreteLibfunc::StorageWrite(_) => {
+                            StarknetConcreteLibfunc::StorageWrite(_)
+                                if !in_recursion || !inner_state.external_calls.is_empty() =>
+                            {
                                 inner_state
                                     .storage_variables_written
                                     .insert(basic_block.clone());
@@ -148,7 +163,9 @@ impl ReentrancyAnalysis {
                                     ),
                                 );
                             }
-                            StarknetConcreteLibfunc::EmitEvent(_) => {
+                            StarknetConcreteLibfunc::EmitEvent(_)
+                                if !in_recursion || !inner_state.external_calls.is_empty() =>
+                            {
                                 inner_state.events.insert(basic_block.clone());
                             }
                             _ => {}
@@ -168,14 +185,19 @@ impl ReentrancyAnalysis {
                                             inner_state
                                                 .storage_variables_read
                                                 .insert(basic_block.clone());
-                                        } else if function_name.ends_with("::write") {
+                                        } else if function_name.ends_with("::write")
+                                            && (!in_recursion
+                                                || !inner_state.external_calls.is_empty())
+                                        {
                                             inner_state
                                                 .storage_variables_written
                                                 .insert(basic_block.clone());
                                         }
                                     }
                                     Type::Event => {
-                                        inner_state.events.insert(basic_block.clone());
+                                        if !in_recursion || !inner_state.external_calls.is_empty() {
+                                            inner_state.events.insert(basic_block.clone());
+                                        }
                                     }
                                     // External and View are needed because it's possible to call self declared external functions within a private function
                                     Type::Private | Type::Loop | Type::External | Type::View => {
@@ -220,6 +242,7 @@ impl ReentrancyAnalysis {
                                                                     functions,
                                                                     registry,
                                                                     private_functions_seen,
+                                                                    true,
                                                                 );
                                                             }
                                                         }

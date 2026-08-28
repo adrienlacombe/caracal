@@ -10,27 +10,32 @@ use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
 use cairo_lang_sierra::extensions::ConcreteType;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement, StatementIdx};
 
-// Scope on cairo >= 2.6: this detector inspects `function_call` statements,
-// so it only sees calls that survive the compiler's inlining. Small private
-// functions — the typical "called and result ignored" case — are inlined into
-// the `__wrapper__*` entrypoint and the unused computation is then deleted
-// outright, leaving no trace in sierra to detect. The detector still works
-// (and is tested) on calls the inliner keeps as real call boundaries:
-// `#[inline(never)]` functions, and functions the inliner rejects (recursive
-// or large bodies). Restoring coverage of the inlined case is not possible at
-// the sierra level — the information no longer exists.
+// This detector inspects `function_call` statements, so it only sees calls
+// that survive in the sierra. Caracal compiles with inlining avoided, so
+// calls to user functions are all visible; only sierra produced with the
+// compiler's default aggressive inlining (e.g. scarb artifacts) loses the
+// inlined calls — and with them the unused computation itself, which is then
+// deleted outright and undetectable. Calls into the corelib (`core::*`,
+// classified `Type::Core`) are skipped: with inlining avoided every helper
+// the compiler used to inline (storage plumbing derefs, serde, box unbox,
+// array ops) shows up as a call, and reporting their partially-consumed
+// return values would be noise about compiler plumbing, not user intent.
 #[derive(Default)]
 pub struct UnusedReturn;
 
-/// Skip leading statements that are pure bookkeeping — no data arguments, no
-/// results — so they can't affect whether a return value is used. The
-/// compiler freely interleaves these with the drop/deconstruct sequence this
-/// detector pattern-matches (e.g. a `disable_ap_tracking` between the
-/// `branch_align` and the `drop` on cairo >= 2.6).
+/// Skip leading statements that are pure bookkeeping — they don't consume or
+/// produce the data values this detector tracks — so they can't affect
+/// whether a return value is used. The compiler freely interleaves these
+/// with the drop/deconstruct sequence this detector pattern-matches (e.g. a
+/// `disable_ap_tracking` between the `branch_align` and the `drop`, or a
+/// `redeposit_gas` right after a `branch_align` on cairo >= 2.6).
 fn skip_bookkeeping(mut stmts: &[SierraStatement]) -> &[SierraStatement] {
     while let Some(SierraStatement::Invocation(invoc)) = stmts.first() {
         let is_bookkeeping = invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
-            n == "branch_align" || n == "disable_ap_tracking" || n == "enable_ap_tracking"
+            n == "branch_align"
+                || n == "disable_ap_tracking"
+                || n == "enable_ap_tracking"
+                || n == "redeposit_gas"
         });
         if !is_bookkeeping {
             break;
@@ -89,12 +94,14 @@ impl Detector for UnusedReturn {
                             if let Some(f) = compilation_unit.functions().find(|f| {
                                 f.name() == f_called.function.id.debug_name.clone().unwrap()
                             }) {
-                                // We don't check for unused return in case of Storage functions
-                                // When a loop function is called in sierra and in that function
-                                // an array is emptied with pop_front this array is dropped
-                                // when returning from the function call and it would be incorrectly
-                                // reported as unused-return
-                                if matches!(f.ty(), &Type::Storage | &Type::Loop) {
+                                // We don't check for unused return in case of Storage, Core
+                                // and Loop functions.
+                                // Storage/Core: compiler/corelib plumbing (see module comment).
+                                // Loop: when a loop function is called in sierra and in that
+                                // function an array is emptied with pop_front this array is
+                                // dropped when returning from the function call and it would
+                                // be incorrectly reported as unused-return.
+                                if matches!(f.ty(), &Type::Storage | &Type::Core | &Type::Loop) {
                                     continue;
                                 }
                             } else {

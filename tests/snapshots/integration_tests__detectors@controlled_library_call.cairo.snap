@@ -9,18 +9,12 @@ input_file: tests/detectors/controlled_library_call.cairo
         impact: High,
         name: "controlled-library-call",
         confidence: Medium,
-        message: "Library call to user controlled class hash in controlled_library_call::controlled_library_call::TestContract::__wrapper__bad1\n library_call_syscall([5], [2], [15], [25], [28]) { fallthrough([29], [30], [31]) 87([32], [33], [34]) }",
+        message: "Library call to user controlled class hash in controlled_library_call::controlled_library_call::TestContract::bad1\n function_call<user@controlled_library_call::controlled_library_call::IAnotherContractLibraryDispatcherImpl::foo>([0], [1], [2], [6], [5]) -> ([7], [8], [9], [10])",
     },
     Result {
         impact: High,
         name: "controlled-library-call",
         confidence: Medium,
-        message: "Library call to user controlled class hash in controlled_library_call::controlled_library_call::TestContract::__wrapper__bad2\n library_call_syscall([5], [2], [15], [25], [28]) { fallthrough([29], [30], [31]) 210([32], [33], [34]) }",
-    },
-    Result {
-        impact: High,
-        name: "controlled-library-call",
-        confidence: Medium,
-        message: "Library call to user controlled class hash in controlled_library_call::controlled_library_call::TestContract::__wrapper__bad3\n library_call_syscall([5], [2], [15], [25], [28]) { fallthrough([29], [30], [31]) 333([32], [33], [34]) }",
+        message: "Library call to user controlled class hash in controlled_library_call::controlled_library_call::TestContract::internal_lib_call\n function_call<user@controlled_library_call::controlled_library_call::IAnotherContractLibraryDispatcherImpl::foo>([0], [1], [2], [5], [4]) -> ([6], [7], [8], [9])",
     },
 ]
