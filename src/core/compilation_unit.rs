@@ -154,9 +154,15 @@ impl CompilationUnit {
     }
 
     fn append_function(&mut self, data: SierraFunction, statements: Vec<SierraStatement>) {
-        // The compiler adds unsafe_new_contract_state which holds the storage variables
-        // for now we don't consider it
-        if !data.id.to_string().ends_with("::unsafe_new_contract_state") {
+        // The compiler adds unsafe_new_contract_state which holds the storage
+        // variables, and one generic unsafe_new_component_state::<...> per
+        // embedded component; for now we don't consider them. (The component
+        // constructor is matched with contains() because its monomorphized
+        // name carries a turbofish suffix.)
+        let name = data.id.to_string();
+        if !name.ends_with("::unsafe_new_contract_state")
+            && !name.contains("::unsafe_new_component_state")
+        {
             self.functions.push(Function::new(data, statements));
         }
     }

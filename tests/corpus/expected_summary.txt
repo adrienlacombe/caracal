@@ -3,12 +3,12 @@
 # corpus: openzeppelin/cairo-contracts v4.0.1
 # scarb: 2.20.0
 contracts-analyzed: 96
-total-findings: 839
+total-findings: 827
 controlled-deploy: 1
 controlled-l1-message: 0
 controlled-library-call: 0
 controlled-replace-class: 7
-dead-code: 12
+dead-code: 0
 felt252-unsafe-arithmetic: 41
 read-only-reentrancy: 0
 reentrancy: 105
