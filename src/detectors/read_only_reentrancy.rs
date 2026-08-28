@@ -4,7 +4,10 @@ use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Function;
 use crate::core::function::Type;
-use crate::utils::{is_safe_external_call, storage_statement_identity};
+use crate::utils::{
+    is_safe_external_call, statement_summary_in_named_function, storage_identity_pretty,
+    storage_statement_identity,
+};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -61,8 +64,11 @@ impl Detector for ReadOnlyReentrancy {
                     } = bb_info.1
                     {
                         for call in reentrancy_info.external_calls.iter() {
-                            let external_function_call =
-                                format!("{}", call.get_function_call().unwrap().get_statement());
+                            let external_function_call = statement_summary_in_named_function(
+                                compilation_unit,
+                                call.get_function(),
+                                call.get_function_call().unwrap().get_statement(),
+                            );
 
                             if is_safe_external_call(call, f.get_statements(), core) {
                                 continue;
@@ -89,6 +95,18 @@ impl Detector for ReadOnlyReentrancy {
                                     })
                                     .unwrap_or_default();
 
+                                let write_summary = statement_summary_in_named_function(
+                                    compilation_unit,
+                                    written_variable.get_function(),
+                                    written_variable
+                                        .get_storage_variable_written()
+                                        .as_ref()
+                                        .unwrap()
+                                        .get_statement(),
+                                );
+                                let variable = storage_identity_pretty(&written_variable_name)
+                                    .unwrap_or_else(|| "Variable".to_string());
+
                                 for (read_variable_name, view_functions) in vars_read.iter() {
                                     // Precise match when both identities are
                                     // known; wildcard when either side is
@@ -106,15 +124,12 @@ impl Detector for ReadOnlyReentrancy {
                                             impact: self.impact(),
                                             confidence: self.confidence(),
                                             message: format!(
-                                                "Read only reentrancy in {}\n\tExternal call {} done in {}\n\tVariable written after {} in {}",
+                                                "Read only reentrancy in {}\n\tExternal call to {} done in {}\n\t{} written after the call by {} in {}.",
                                                 view_function,
                                                 external_function_call,
                                                 call.get_function(),
-                                                written_variable
-                                                    .get_storage_variable_written()
-                                                    .as_ref()
-                                                    .unwrap()
-                                                    .get_statement(),
+                                                variable,
+                                                write_summary,
                                                 written_variable.get_function(),
                                             ),
                                         });

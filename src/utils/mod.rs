@@ -300,6 +300,112 @@ pub fn is_safe_external_call(
     safe_selectors.iter().any(|s| s == &selector_val)
 }
 
+/// Strip generic arguments from a (possibly turbofish) path:
+/// `Impl::<A, B<C>>::write` -> `Impl::write`, `emit::<E, F>` -> `emit`.
+fn strip_generic_args(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    let mut depth = 0usize;
+    for c in path.chars() {
+        match c {
+            '<' => {
+                if depth == 0 && out.ends_with("::") {
+                    out.truncate(out.len() - 2);
+                }
+                depth += 1;
+            }
+            '>' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => out.push(c),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Render a sierra statement for a finding message. VarIds and branch
+/// targets are compiler-assigned and churn on every compiler bump, so they
+/// never appear: `function_call<user@PATH>(args) -> (results)` renders as
+/// the callee PATH with its generic arguments stripped (the fully-generic
+/// corelib accessor paths run to ~1.5KB otherwise), and any other libfunc
+/// renders as the libfunc name alone — short generic arguments like
+/// `<felt252>` are kept, argument/result lists and branch info never are.
+pub fn statement_summary(stmt: &SierraStatement) -> String {
+    let SierraStatement::Invocation(invoc) = stmt else {
+        // Return statements are never the subject of a finding message.
+        return "return".to_string();
+    };
+    let name = invoc.libfunc_id.to_string();
+    if let Some(callee) = name
+        .strip_prefix("function_call<user@")
+        .and_then(|n| n.strip_suffix('>'))
+    {
+        return strip_generic_args(callee);
+    }
+    if name.len() > 80 {
+        if let Some((base, _)) = name.split_once('<') {
+            return base.to_string();
+        }
+    }
+    name
+}
+
+/// Like `statement_summary`, with a stable occurrence ordinal appended when
+/// the summary alone is ambiguous within the owning function's statements —
+/// e.g. two calls to the same callee in different branches render as
+/// `…::foo (1st occurrence)` / `…::foo (2nd occurrence)`. Results are
+/// collected in a HashSet keyed partly by message, so without the ordinal
+/// such findings would collapse into one; occurrence order is stable across
+/// compiler bumps, unlike VarIds.
+pub fn statement_summary_in_function(
+    stmt: &SierraStatement,
+    owner_statements: &[SierraStatement],
+) -> String {
+    let summary = statement_summary(stmt);
+    let occurrences: Vec<&SierraStatement> = owner_statements
+        .iter()
+        .filter(|s| statement_summary(s) == summary)
+        .collect();
+    if occurrences.len() > 1 {
+        if let Some(position) = occurrences.iter().position(|s| *s == stmt) {
+            return format!(
+                "{} ({} occurrence)",
+                summary,
+                number_to_ordinal(position as u64 + 1)
+            );
+        }
+    }
+    summary
+}
+
+/// Summary of a statement disambiguated within the function that owns it,
+/// resolved by name — reads/writes/calls can be recorded in a different
+/// function than the one under analysis (through the reentrancy analysis'
+/// private-call recursion). Falls back to the bare summary when the owner
+/// cannot be resolved.
+pub fn statement_summary_in_named_function(
+    compilation_unit: &CompilationUnit,
+    owner: &str,
+    stmt: &SierraStatement,
+) -> String {
+    match compilation_unit.function_by_name(owner) {
+        Some(f) => statement_summary_in_function(stmt, f.get_statements()),
+        None => statement_summary(stmt),
+    }
+}
+
+/// Compact human form of a `storage_statement_identity` /
+/// `storage_variable_identity` result for finding messages:
+/// `path::to::Contract::StorageStorageBase#2` renders as
+/// "Storage variable #2 of path::to::Contract". Identities in other forms
+/// (pre-2.6 accessor paths, raw hashed storage addresses) return `None`.
+pub fn storage_identity_pretty(identity: &str) -> Option<String> {
+    let (ty, index) = identity.rsplit_once('#')?;
+    let contract = ty.strip_suffix("::StorageStorageBase")?;
+    if contract.is_empty() || index.is_empty() || !index.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    Some(format!("Storage variable #{index} of {contract}"))
+}
+
 /// Get a number as input and return the ordinal representation
 pub fn number_to_ordinal(n: u64) -> String {
     let s = n.to_string();

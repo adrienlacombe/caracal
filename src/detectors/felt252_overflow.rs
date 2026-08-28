@@ -1,6 +1,7 @@
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
+use crate::utils::{number_to_ordinal, statement_summary_in_function};
 use cairo_lang_sierra::extensions::felt252::Felt252BinaryOperationConcrete;
 use cairo_lang_sierra::extensions::felt252::Felt252BinaryOperator;
 use cairo_lang_sierra::extensions::{core::CoreConcreteLibfunc, felt252::Felt252Concrete};
@@ -121,22 +122,27 @@ impl Detector for Felt252Overflow {
     }
 }
 impl Felt252Overflow {
+    #[allow(clippy::too_many_arguments)]
     fn check_felt252_tainted(
         &self,
         results: &mut HashSet<Result>,
         compilation_unit: &CompilationUnit,
         libfunc: &SierraStatement,
+        statements: &[SierraStatement],
         args: &[VarId],
         name: &String,
     ) {
+        let operation = statement_summary_in_function(libfunc, statements);
         let mut tainted_by: HashSet<&VarId> = HashSet::new();
         let mut taints = String::new();
-        for param in args.iter() {
-            // TODO: improve when we have source mapping,can add parameter's name instead of ID
+        for (position, param) in args.iter().enumerate() {
+            // Refer to the operands by position — VarIds are renumbered on
+            // every compiler bump.
+            // TODO: improve when we have source mapping,can add parameter's name instead
             if compilation_unit.is_tainted(name.to_string(), param.clone())
                 && !tainted_by.contains(&param)
             {
-                let msg = format!("{},", param);
+                let msg = format!("{},", number_to_ordinal(position as u64 + 1));
                 taints.push_str(&msg);
                 tainted_by.insert(param);
             }
@@ -147,7 +153,7 @@ impl Felt252Overflow {
         if tainted_by.is_empty() {
             let msg = format!(
                 "The function {} uses the felt252 operation {}, which is not overflow/underflow safe",
-                name, libfunc
+                name, operation
             );
             results.insert(Result {
                 name: self.name().to_string(),
@@ -157,9 +163,9 @@ impl Felt252Overflow {
             });
         } else {
             let msg = format!(
-                    "The function {} uses the felt252 operation {} with the user-controlled parameters: {}, which is not overflow/underflow safe",
+                    "The function {} uses the felt252 operation {} with the user-controlled operands: {}, which is not overflow/underflow safe",
                     name,
-                    libfunc,
+                    operation,
                     taints
                 );
             results.insert(Result {
@@ -195,13 +201,21 @@ impl Felt252Overflow {
                         results,
                         compilation_unit,
                         libfunc,
+                        statements,
                         &invoc.args,
                         name,
                     );
                 }
             }
             _ => {
-                self.check_felt252_tainted(results, compilation_unit, libfunc, &invoc.args, name);
+                self.check_felt252_tainted(
+                    results,
+                    compilation_unit,
+                    libfunc,
+                    statements,
+                    &invoc.args,
+                    name,
+                );
             }
         }
     }

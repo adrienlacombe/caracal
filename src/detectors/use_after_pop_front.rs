@@ -137,7 +137,7 @@ impl Detector for UseAfterPopFront {
                     .collect();
 
                 // Required to silence clippy too-complex-type warning
-                type BadCollectionType<'a, 'b> = Vec<(&'a WrapperVariable, &'b CollectionType)>;
+                type BadCollectionType<'a> = Vec<(usize, &'a CollectionType)>;
 
                 let (bad_array_used, bad_span_used): (BadCollectionType, BadCollectionType) =
                     pop_fronts
@@ -150,27 +150,40 @@ impl Detector for UseAfterPopFront {
                                 *index,
                             );
                             if is_used {
-                                Some((bad_array, collection_type))
+                                Some((*index, collection_type))
                             } else {
                                 None
                             }
                         })
                         .partition(|(_, collection_type)| collection_type.is_array());
 
+                // The popped collections have no names at the sierra level and
+                // their VarIds are renumbered on every compiler bump, so refer
+                // to them by their pop order within the function among pops of
+                // the same kind (#1 = the first array/span popped).
+                let pop_ordinal = |stmt_index: usize, is_array: bool| {
+                    pop_fronts
+                        .iter()
+                        .filter(|(_, _, ct)| ct.is_array() == is_array)
+                        .position(|(i, _, _)| *i == stmt_index)
+                        .map(|p| p + 1)
+                        .unwrap_or(0)
+                };
+
                 if !bad_array_used.is_empty() {
                     let array_ids = bad_array_used
                         .iter()
-                        .map(|f| f.0.variable())
-                        .collect::<Vec<u64>>();
+                        .map(|(i, _)| format!("#{}", pop_ordinal(*i, true)))
+                        .collect::<Vec<String>>();
                     let message = match array_ids.len() {
                         1 => format!(
-                            "The array {:?} is used after removing elements from it in the function {}",
-                            array_ids,
+                            "The array {} is used after removing elements from it in the function {}",
+                            array_ids[0],
                             function.name()
                         ),
                         _ => format!(
-                            "The arrays {:?} are used after removing elements from them in the function {}",
-                            array_ids,
+                            "The arrays {} are used after removing elements from them in the function {}",
+                            array_ids.join(", "),
                             function.name()
                         )
                     };
@@ -185,17 +198,17 @@ impl Detector for UseAfterPopFront {
                 if !bad_span_used.is_empty() {
                     let span_ids = bad_span_used
                         .iter()
-                        .map(|f| f.0.variable())
-                        .collect::<Vec<u64>>();
+                        .map(|(i, _)| format!("#{}", pop_ordinal(*i, false)))
+                        .collect::<Vec<String>>();
                     let message = match span_ids.len() {
                         1 => format!(
-                            "The span {:?} is used after removing elements from it in the function {}",
-                            span_ids,
+                            "The span {} is used after removing elements from it in the function {}",
+                            span_ids[0],
                             function.name()
                         ),
                         _ => format!(
-                            "The spans {:?} are used after removing elements from them in the function {}",
-                            span_ids,
+                            "The spans {} are used after removing elements from them in the function {}",
+                            span_ids.join(", "),
                             function.name()
                         )
                     };

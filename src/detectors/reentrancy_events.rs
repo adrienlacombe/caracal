@@ -4,7 +4,7 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::is_safe_external_call;
+use crate::utils::{is_safe_external_call, statement_summary_in_named_function};
 
 #[derive(Default)]
 pub struct ReentrancyEvents;
@@ -40,25 +40,31 @@ impl Detector for ReentrancyEvents {
                     {
                         for event in reentrancy_info.events.iter() {
                             for call in reentrancy_info.external_calls.iter() {
-                                let external_function_call = format!(
-                                    "{}",
-                                    call.get_function_call().unwrap().get_statement()
+                                let external_function_call = statement_summary_in_named_function(
+                                    compilation_unit,
+                                    call.get_function(),
+                                    call.get_function_call().unwrap().get_statement(),
                                 );
 
                                 if is_safe_external_call(call, f.get_statements(), core) {
                                     continue;
                                 }
 
+                                let event_summary = statement_summary_in_named_function(
+                                    compilation_unit,
+                                    event.get_function(),
+                                    event.get_event_emitted().as_ref().unwrap().get_statement(),
+                                );
                                 results.insert(Result {
                                     name: self.name().to_string(),
                                     impact: self.impact(),
                                     confidence: self.confidence(),
                                     message: format!(
-                                        "Reentrancy in {}\n\tExternal call {} done in {}\n\tEvent emitted after {} in {}.",
+                                        "Reentrancy in {}\n\tExternal call to {} done in {}\n\tEvent emitted after the call by {} in {}.",
                                         f.name(),
                                         external_function_call,
                                         call.get_function(),
-                                        event.get_event_emitted().as_ref().unwrap().get_statement(),
+                                        event_summary,
                                         event.get_function()
                                     ),
                                 });

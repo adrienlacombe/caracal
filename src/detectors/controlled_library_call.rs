@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::filter_builtins_from_arguments;
+use crate::utils::{filter_builtins_from_arguments, statement_summary_in_named_function};
 use cairo_lang_sierra::extensions::{
     core::CoreConcreteLibfunc, lib_func::ParamSignature, starknet::StarknetConcreteLibfunc,
 };
@@ -108,7 +108,8 @@ impl ControlledLibraryCall {
         if compilation_unit.is_tainted(function_name.to_string(), class_hash) {
             let message = format!(
                 "Library call to user controlled class hash in {}\n {}",
-                function_name, statement
+                function_name,
+                statement_summary_in_named_function(compilation_unit, function_name, statement)
             );
             results.insert(Result {
                 name: self.name().to_string(),
