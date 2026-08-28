@@ -37,8 +37,13 @@ impl Printer for CallgraphPrinter {
                     self.print_callgraph(compilation_unit, f, &mut tracked_contracts, &mut graph)
                 }),
             }
-            // Add generated subgraphs to original digraph
-            for val in tracked_contracts.values() {
+            // Add generated subgraphs to the original digraph in a stable
+            // order: HashMap iteration order changes from run to run (random
+            // hasher seed), and printer output must be run-to-run
+            // deterministic like detector output.
+            let mut modules: Vec<(&String, &Subgraph)> = tracked_contracts.iter().collect();
+            modules.sort_by_key(|(name, _)| *name);
+            for (_, val) in modules {
                 graph.add_stmt(Stmt::Subgraph(val.clone()));
             }
             // Write callgraph to file

@@ -84,11 +84,17 @@ impl Detector for UnusedReturn {
                                     continue;
                                 }
                             } else {
-                                // Should never happen
-                                eprintln!(
-                                    "Unused-return: function not found {}",
-                                    f_called.function.id.debug_name.clone().unwrap()
-                                );
+                                // unsafe_new_contract_state / unsafe_new_component_state
+                                // are deliberately excluded from the function list
+                                // (see CompilationUnit::append_function), so a lookup
+                                // miss for them is expected — every entrypoint wrapper
+                                // calls one. Anything else should never happen.
+                                let callee = f_called.function.id.debug_name.clone().unwrap();
+                                if !callee.ends_with("::unsafe_new_contract_state")
+                                    && !callee.contains("::unsafe_new_component_state")
+                                {
+                                    eprintln!("Unused-return: function not found {callee}");
+                                }
                                 continue;
                             }
 
