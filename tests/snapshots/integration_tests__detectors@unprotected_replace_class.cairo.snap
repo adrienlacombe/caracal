@@ -9,12 +9,12 @@ input_file: tests/detectors/unprotected_replace_class.cairo
         impact: High,
         name: "unprotected-replace-class",
         confidence: Low,
-        message: "The external function unprotected_replace_class::unprotected_replace_class::UnprotectedReplaceClass::__wrapper__bad_upgrade can replace the contract class without a caller address check",
+        message: "The external function unprotected_replace_class::unprotected_replace_class::UnprotectedReplaceClass::__wrapper__bad_upgrade (unprotected_replace_class.cairo:15) can replace the contract class without a caller address check",
     },
     Result {
         impact: High,
         name: "unprotected-replace-class",
         confidence: Low,
-        message: "The external function unprotected_replace_class::unprotected_replace_class::UnprotectedReplaceClass::__wrapper__bad_upgrade_indirect can replace the contract class without a caller address check",
+        message: "The external function unprotected_replace_class::unprotected_replace_class::UnprotectedReplaceClass::__wrapper__bad_upgrade_indirect (unprotected_replace_class.cairo:23) can replace the contract class without a caller address check",
     },
 ]

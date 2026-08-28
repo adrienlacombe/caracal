@@ -9,12 +9,12 @@ input_file: tests/detectors/controlled_deploy.cairo
         impact: High,
         name: "controlled-deploy",
         confidence: Medium,
-        message: "deploy_syscall with user controlled class hash in controlled_deploy::controlled_deploy::DeployContract::bad_direct\n deploy_syscall",
+        message: "deploy_syscall with user controlled class hash in controlled_deploy::controlled_deploy::DeployContract::bad_direct\n deploy_syscall (controlled_deploy.cairo:15)",
     },
     Result {
         impact: High,
         name: "controlled-deploy",
         confidence: Medium,
-        message: "deploy_syscall with user controlled class hash in controlled_deploy::controlled_deploy::DeployContract::do_deploy\n deploy_syscall",
+        message: "deploy_syscall with user controlled class hash in controlled_deploy::controlled_deploy::DeployContract::do_deploy\n deploy_syscall (controlled_deploy.cairo:28)",
     },
 ]

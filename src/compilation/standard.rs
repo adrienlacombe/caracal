@@ -21,6 +21,7 @@ use super::ProgramCompiled;
 use crate::compilation::utils::felt252_serde::sierra_from_felt252s;
 use crate::compilation::utils::replacer::SierraProgramDebugReplacer;
 use crate::core::core_unit::CoreOpts;
+use crate::core::source_map::SourceMap;
 
 pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     // The bundled in-process compiler (which avoids function inlining, giving
@@ -97,6 +98,11 @@ fn bundled_compiler(opts: CoreOpts, corelib: PathBuf) -> Result<Vec<ProgramCompi
         diagnostics_reporter: DiagnosticsReporter::stderr()
             .allow_warnings()
             .with_crates(&main_crate_inputs),
+        // Annotate the contract class with sierra statement → Cairo source
+        // mappings (and per-function declaration sites) so findings can point
+        // at file:line in the analyzed source.
+        add_statements_code_locations: true,
+        add_functions_debug_info: true,
         ..Default::default()
     };
 
@@ -115,8 +121,15 @@ fn bundled_compiler(opts: CoreOpts, corelib: PathBuf) -> Result<Vec<ProgramCompi
 
     let mut programs_compiled: Vec<ProgramCompiled> = vec![];
 
+    // Source locations in findings are reported relative to the directory the
+    // analyzed file lives in; locations outside it (corelib) are dropped.
+    let source_base = opts.target.parent().and_then(|p| p.canonicalize().ok());
+
     for contract_class in contract_classes {
         let debug_info = contract_class.sierra_program_debug_info.unwrap();
+        let source_map = source_base
+            .as_deref()
+            .map(|base| SourceMap::new(&debug_info, base));
         let program = sierra_from_felt252s(&contract_class.sierra_program)
             .unwrap()
             .2;
@@ -125,6 +138,7 @@ fn bundled_compiler(opts: CoreOpts, corelib: PathBuf) -> Result<Vec<ProgramCompi
         programs_compiled.push(ProgramCompiled {
             sierra: program,
             abi: contract_class.abi.unwrap(),
+            source_map,
         });
     }
 
@@ -172,5 +186,7 @@ fn local_compiler(opts: CoreOpts, single_file_flag: bool) -> Result<Vec<ProgramC
     Ok(vec![ProgramCompiled {
         sierra,
         abi: contract_class.abi.unwrap(),
+        // Pre-built by an external compiler: no source mapping available.
+        source_map: None,
     }])
 }

@@ -92,6 +92,9 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         programs_compiled.push(ProgramCompiled {
             sierra: program,
             abi: contract_class.abi.unwrap(),
+            // Scarb artifacts don't carry the source-location annotations
+            // caracal's bundled compiler emits: no source mapping available.
+            source_map: None,
         });
     }
 

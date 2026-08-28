@@ -1,5 +1,6 @@
 ---
 source: tests/integration_tests.rs
+assertion_line: 23
 expression: results
 input_file: tests/detectors/dead_code.cairo
 ---
@@ -8,13 +9,13 @@ input_file: tests/detectors/dead_code.cairo
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function dead_code::dead_code::DeadCode::add_1 uses the felt252 operation core::Felt252Add::add with the user-controlled operands: 1st, which is not overflow/underflow safe",
+        message: "The function dead_code::dead_code::DeadCode::add_1 uses the felt252 operation core::Felt252Add::add (dead_code.cairo:55) with the user-controlled operands: 1st, which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,
         name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The function dead_code::dead_code::testcomp::InternalImpl::<dead_code::dead_code::DeadCode::ContractState, dead_code::dead_code::DeadCode::HasComponentImpl_testcomp>::bump uses the felt252 operation core::Felt252Add::add, which is not overflow/underflow safe",
+        message: "The function dead_code::dead_code::testcomp::InternalImpl::<dead_code::dead_code::DeadCode::ContractState, dead_code::dead_code::DeadCode::HasComponentImpl_testcomp>::bump uses the felt252 operation core::Felt252Add::add (dead_code.cairo:20), which is not overflow/underflow safe",
     },
     Result {
         impact: Medium,

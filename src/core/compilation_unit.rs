@@ -1,4 +1,5 @@
 use super::function::{Function, Type};
+use super::source_map::{SourceLocation, SourceMap};
 use crate::analysis::taint::Taint;
 use crate::analysis::taint::WrapperVariable;
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreLibfunc, CoreType};
@@ -40,6 +41,9 @@ pub struct CompilationUnit {
     registry: ProgramRegistry<CoreType, CoreLibfunc>,
     /// Function name to taints
     taint: HashMap<String, Taint>,
+    /// Sierra → Cairo source mapping; `None` when the analyzed sierra comes
+    /// from a pre-built artifact where no source mapping survives
+    source_map: Option<SourceMap>,
 }
 
 impl CompilationUnit {
@@ -47,6 +51,7 @@ impl CompilationUnit {
         sierra_program: Program,
         abi: Contract,
         registry: ProgramRegistry<CoreType, CoreLibfunc>,
+        source_map: Option<SourceMap>,
     ) -> Self {
         CompilationUnit {
             sierra_program,
@@ -54,7 +59,35 @@ impl CompilationUnit {
             abi,
             registry,
             taint: HashMap::new(),
+            source_map,
         }
+    }
+
+    /// Cairo source location the statement was generated from, resolved
+    /// against the function that owns the statement (named `owner` — it may
+    /// differ from the function under analysis, e.g. through the reentrancy
+    /// analysis' private-call recursion). `None` when no source mapping is
+    /// available, the owner can't be resolved, or the statement maps outside
+    /// the analyzed target (corelib code).
+    pub fn statement_location(
+        &self,
+        owner: &str,
+        stmt: &SierraStatement,
+    ) -> Option<&SourceLocation> {
+        let source_map = self.source_map.as_ref()?;
+        let function = self.function_by_name(owner)?;
+        // Find the statement's offset within its owner to recover its
+        // program-level index. Byte-identical statements resolve to the first
+        // occurrence — the same approximation the summary-ordinal logic makes.
+        let position = function.get_statements().iter().position(|s| s == stmt)?;
+        source_map.statement(function.entry_point() + position)
+    }
+
+    /// Cairo declaration site of the sierra function named `name`. Same
+    /// `None` conditions as [`Self::statement_location`].
+    pub fn function_location(&self, name: &str) -> Option<&SourceLocation> {
+        let source_map = self.source_map.as_ref()?;
+        source_map.function(self.function_by_name(name)?.id())
     }
 
     /// Returns all the functions in the Sierra program

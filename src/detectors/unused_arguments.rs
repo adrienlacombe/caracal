@@ -1,6 +1,6 @@
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::core_unit::CoreUnit;
-use crate::utils::number_to_ordinal;
+use crate::utils::{function_summary, number_to_ordinal};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::program::Statement as SierraStatement;
 use std::collections::HashSet;
@@ -153,7 +153,7 @@ impl Detector for UnusedArguments {
                                     message: format!(
                                         "The {} argument in {} is never used",
                                         number_to_ordinal(invoc.args[0].id - offset as u64 + 1),
-                                        f.name()
+                                        function_summary(compilation_unit, &f.name())
                                     ),
                                 });
                             }

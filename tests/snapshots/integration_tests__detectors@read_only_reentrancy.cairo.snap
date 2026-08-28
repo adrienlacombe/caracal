@@ -9,12 +9,12 @@ input_file: tests/detectors/read_only_reentrancy.cairo
         impact: Medium,
         name: "read-only-reentrancy",
         confidence: Medium,
-        message: "Read only reentrancy in read_only_reentrancy::read_only_reentrancy::TestContract::__wrapper__get_a\n\tExternal call to read_only_reentrancy::read_only_reentrancy::IAnotherContractDispatcherImpl::foo done in read_only_reentrancy::read_only_reentrancy::TestContract::bad\n\tStorage variable #0 of read_only_reentrancy::read_only_reentrancy::TestContract written after the call by core::starknet::storage::StorablePointerWriteAccessImpl::write in read_only_reentrancy::read_only_reentrancy::TestContract::bad.",
+        message: "Read only reentrancy in read_only_reentrancy::read_only_reentrancy::TestContract::__wrapper__get_a\n\tExternal call to read_only_reentrancy::read_only_reentrancy::IAnotherContractDispatcherImpl::foo (read_only_reentrancy.cairo:31) done in read_only_reentrancy::read_only_reentrancy::TestContract::bad\n\tStorage variable #0 of read_only_reentrancy::read_only_reentrancy::TestContract written after the call by core::starknet::storage::StorablePointerWriteAccessImpl::write (read_only_reentrancy.cairo:32) in read_only_reentrancy::read_only_reentrancy::TestContract::bad.",
     },
     Result {
         impact: Low,
         name: "reentrancy-benign",
         confidence: Medium,
-        message: "Reentrancy in read_only_reentrancy::read_only_reentrancy::TestContract::__wrapper__bad\n\tExternal call to read_only_reentrancy::read_only_reentrancy::IAnotherContractDispatcherImpl::foo done in read_only_reentrancy::read_only_reentrancy::TestContract::bad\n\tStorage variable #0 of read_only_reentrancy::read_only_reentrancy::TestContract written after the call by core::starknet::storage::StorablePointerWriteAccessImpl::write in read_only_reentrancy::read_only_reentrancy::TestContract::bad.",
+        message: "Reentrancy in read_only_reentrancy::read_only_reentrancy::TestContract::__wrapper__bad\n\tExternal call to read_only_reentrancy::read_only_reentrancy::IAnotherContractDispatcherImpl::foo (read_only_reentrancy.cairo:31) done in read_only_reentrancy::read_only_reentrancy::TestContract::bad\n\tStorage variable #0 of read_only_reentrancy::read_only_reentrancy::TestContract written after the call by core::starknet::storage::StorablePointerWriteAccessImpl::write (read_only_reentrancy.cairo:32) in read_only_reentrancy::read_only_reentrancy::TestContract::bad.",
     },
 ]

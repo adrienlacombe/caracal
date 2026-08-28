@@ -112,6 +112,18 @@ impl Function {
         self.data.id.to_string()
     }
 
+    /// Numeric sierra id of the function (stable across the debug-name
+    /// replacement — only `debug_name` is rewritten).
+    pub fn id(&self) -> u64 {
+        self.data.id.id
+    }
+
+    /// Program-level statement index of the function's first statement;
+    /// `entry_point() + i` is the program-level index of `get_statements()[i]`.
+    pub fn entry_point(&self) -> usize {
+        self.data.entry_point.0
+    }
+
     pub fn ty(&self) -> &Type {
         // At this point is always initialized
         self.ty.as_ref().unwrap()

@@ -3,6 +3,7 @@ use crate::analysis::taint::WrapperVariable;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::{Function, Type};
+use crate::utils::function_summary;
 use cairo_lang_sierra::extensions::{core::CoreConcreteLibfunc, felt252::Felt252Concrete};
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
@@ -112,7 +113,7 @@ impl Detector for UncheckedL1HandlerFrom {
                 if !from_checked {
                     let message = format!(
                         "The L1 handler function {} does not check the L1 from address",
-                        f.name()
+                        function_summary(compilation_unit, &f.name())
                     );
                     results.insert(Result {
                         name: self.name().to_string(),

@@ -3,6 +3,7 @@ use crate::analysis::taint::WrapperVariable;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Function;
+use crate::utils::function_summary;
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::felt252::Felt252Concrete;
 use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
@@ -92,7 +93,7 @@ impl Detector for TxOrigin {
                 if tx_origin_used {
                     let message = format!(
                         "The transaction origin contract address is used in an access control check in the function {}",
-                        function.name()
+                        function_summary(compilation_unit, &function.name())
                     );
                     results.insert(Result {
                         name: self.name().to_string(),

@@ -5,6 +5,7 @@ use cairo_lang_sierra::program::Program;
 use cairo_lang_starknet_classes::abi::Contract;
 
 use crate::core::core_unit::CoreOpts;
+use crate::core::source_map::SourceMap;
 
 mod cairo_project;
 mod corelib;
@@ -15,6 +16,11 @@ pub mod utils;
 pub struct ProgramCompiled {
     pub sierra: Program,
     pub abi: Contract,
+    /// Sierra → Cairo source mapping, recovered from the debug-info
+    /// annotations the bundled compiler emits. `None` when the analyzed
+    /// sierra comes from a pre-built artifact (the Scarb flow and the
+    /// `starknet-compile` fallback), where no source mapping survives.
+    pub source_map: Option<SourceMap>,
 }
 
 /// Printed when caracal falls back to a local `starknet-compile` binary

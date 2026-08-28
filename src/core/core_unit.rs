@@ -47,6 +47,7 @@ impl CoreUnit {
                     p.sierra.clone(),
                     p.abi.clone(),
                     ProgramRegistry::<CoreType, CoreLibfunc>::new(&p.sierra).unwrap(),
+                    p.source_map.clone(),
                 );
                 compilation_unit.analyze();
                 compilation_unit

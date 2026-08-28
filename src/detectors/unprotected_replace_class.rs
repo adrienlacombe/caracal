@@ -4,6 +4,7 @@ use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::{Function, Type};
 use crate::utils::filter_builtins_from_returns;
+use crate::utils::function_summary;
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::felt252::Felt252Concrete;
 use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
@@ -80,7 +81,7 @@ impl Detector for UnprotectedReplaceClass {
                     confidence: self.confidence(),
                     message: format!(
                         "The external function {} can replace the contract class without a caller address check",
-                        f.name()
+                        function_summary(compilation_unit, &f.name())
                     ),
                 });
             }

@@ -5,6 +5,7 @@ use crate::analysis::taint::WrapperVariable;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::{Function, Type};
+use crate::utils::function_summary;
 use cairo_lang_sierra::extensions::array::ArrayConcreteLibfunc;
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreTypeConcrete};
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
@@ -179,12 +180,12 @@ impl Detector for UseAfterPopFront {
                         1 => format!(
                             "The array {} is used after removing elements from it in the function {}",
                             array_ids[0],
-                            function.name()
+                            function_summary(compilation_unit, &function.name())
                         ),
                         _ => format!(
                             "The arrays {} are used after removing elements from them in the function {}",
                             array_ids.join(", "),
-                            function.name()
+                            function_summary(compilation_unit, &function.name())
                         )
                     };
                     results.insert(Result {
@@ -204,12 +205,12 @@ impl Detector for UseAfterPopFront {
                         1 => format!(
                             "The span {} is used after removing elements from it in the function {}",
                             span_ids[0],
-                            function.name()
+                            function_summary(compilation_unit, &function.name())
                         ),
                         _ => format!(
                             "The spans {} are used after removing elements from them in the function {}",
                             span_ids.join(", "),
-                            function.name()
+                            function_summary(compilation_unit, &function.name())
                         )
                     };
                     results.insert(Result {

@@ -401,15 +401,33 @@ pub fn statement_summary_in_function(
 /// resolved by name — reads/writes/calls can be recorded in a different
 /// function than the one under analysis (through the reentrancy analysis'
 /// private-call recursion). Falls back to the bare summary when the owner
-/// cannot be resolved.
+/// cannot be resolved. When the statement maps to Cairo source of the
+/// analyzed target, the location is appended as ` (path/to/file.cairo:LINE)`;
+/// statements without a mapping (pre-built artifacts, corelib-owned code)
+/// keep the location-less summary.
 pub fn statement_summary_in_named_function(
     compilation_unit: &CompilationUnit,
     owner: &str,
     stmt: &SierraStatement,
 ) -> String {
-    match compilation_unit.function_by_name(owner) {
+    let summary = match compilation_unit.function_by_name(owner) {
         Some(f) => statement_summary_in_function(stmt, f.get_statements()),
         None => statement_summary(stmt),
+    };
+    match compilation_unit.statement_location(owner, stmt) {
+        Some(location) => format!("{summary} ({location})"),
+        None => summary,
+    }
+}
+
+/// A function name for a finding message, with its Cairo declaration site
+/// appended as ` (path/to/file.cairo:LINE)` when available. Functions
+/// without a mapping (pre-built artifacts, unresolvable names) render as the
+/// bare name.
+pub fn function_summary(compilation_unit: &CompilationUnit, name: &str) -> String {
+    match compilation_unit.function_location(name) {
+        Some(location) => format!("{name} ({location})"),
+        None => name.to_string(),
     }
 }
 

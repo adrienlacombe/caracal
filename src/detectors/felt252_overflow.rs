@@ -1,7 +1,7 @@
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::{number_to_ordinal, statement_summary_in_function};
+use crate::utils::{number_to_ordinal, statement_summary_in_named_function};
 use cairo_lang_sierra::extensions::felt252::Felt252BinaryOperationConcrete;
 use cairo_lang_sierra::extensions::felt252::Felt252BinaryOperator;
 use cairo_lang_sierra::extensions::{core::CoreConcreteLibfunc, felt252::Felt252Concrete};
@@ -128,11 +128,10 @@ impl Felt252Overflow {
         results: &mut HashSet<Result>,
         compilation_unit: &CompilationUnit,
         libfunc: &SierraStatement,
-        statements: &[SierraStatement],
         args: &[VarId],
         name: &String,
     ) {
-        let operation = statement_summary_in_function(libfunc, statements);
+        let operation = statement_summary_in_named_function(compilation_unit, name, libfunc);
         let mut tainted_by: HashSet<&VarId> = HashSet::new();
         let mut taints = String::new();
         for (position, param) in args.iter().enumerate() {
@@ -201,21 +200,13 @@ impl Felt252Overflow {
                         results,
                         compilation_unit,
                         libfunc,
-                        statements,
                         &invoc.args,
                         name,
                     );
                 }
             }
             _ => {
-                self.check_felt252_tainted(
-                    results,
-                    compilation_unit,
-                    libfunc,
-                    statements,
-                    &invoc.args,
-                    name,
-                );
+                self.check_felt252_tainted(results, compilation_unit, libfunc, &invoc.args, name);
             }
         }
     }
