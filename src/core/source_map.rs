@@ -15,7 +15,7 @@ const STATEMENTS_NAMESPACE: &str = "github.com/software-mansion/cairo-coverage";
 const FUNCTIONS_NAMESPACE: &str = "github.com/software-mansion-labs/cairo-debugger";
 
 /// A position in a Cairo source file of the analyzed target.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize)]
 pub struct SourceLocation {
     /// Path of the `.cairo` file, relative to the analyzed target (the
     /// target's directory for a single-file target, the project root for a

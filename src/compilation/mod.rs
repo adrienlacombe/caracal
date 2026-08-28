@@ -45,10 +45,13 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         if let Ok(entries) = fs::read_dir(opts.target.as_path()) {
             for entry in entries.flatten() {
                 if entry.file_name() == "Scarb.toml" {
-                    println!("Compiling with Scarb. Found Scarb.toml.");
+                    // Progress goes to stderr: stdout is reserved for
+                    // analysis output (machine-readable when
+                    // `--format json|sarif`).
+                    eprintln!("Compiling with Scarb. Found Scarb.toml.");
                     return scarb::compile(opts);
                 } else if entry.file_name() == "cairo_project.toml" {
-                    println!("Compiling with Cairo. Found cairo_project.toml.");
+                    eprintln!("Compiling with Cairo. Found cairo_project.toml.");
                     return cairo_project::compile(opts);
                 }
             }

@@ -5,8 +5,8 @@ use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
 use crate::utils::{
-    is_safe_external_call, statement_summary_in_named_function, storage_identity_pretty,
-    storage_variable_identity,
+    is_safe_external_call, statement_locations, statement_summary_in_named_function,
+    storage_identity_pretty, storage_variable_identity,
 };
 
 #[derive(Default)]
@@ -43,6 +43,11 @@ impl Detector for Reentrancy {
                     {
                         for call in reentrancy_info.external_calls.iter() {
                             let external_function_call = statement_summary_in_named_function(
+                                compilation_unit,
+                                call.get_function(),
+                                call.get_function_call().unwrap().get_statement(),
+                            );
+                            let call_locations = statement_locations(
                                 compilation_unit,
                                 call.get_function(),
                                 call.get_function_call().unwrap().get_statement(),
@@ -113,6 +118,18 @@ impl Detector for Reentrancy {
                                                 .unwrap()
                                                 .get_statement(),
                                         );
+                                        // Call first, then the write — the
+                                        // order the message mentions them in.
+                                        let mut locations = call_locations.clone();
+                                        locations.extend(statement_locations(
+                                            compilation_unit,
+                                            written_variable.get_function(),
+                                            written_variable
+                                                .get_storage_variable_written()
+                                                .as_ref()
+                                                .unwrap()
+                                                .get_statement(),
+                                        ));
                                         let variable =
                                             storage_identity_pretty(&written_variable_name)
                                                 .unwrap_or_else(|| "Variable".to_string());
@@ -129,6 +146,7 @@ impl Detector for Reentrancy {
                                                 write_summary,
                                                 written_variable.get_function()
                                             ),
+                                            locations,
                                         });
                                     }
                                 }

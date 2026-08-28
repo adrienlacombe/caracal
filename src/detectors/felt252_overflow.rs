@@ -1,7 +1,7 @@
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::{number_to_ordinal, statement_summary_in_named_function};
+use crate::utils::{number_to_ordinal, statement_locations, statement_summary_in_named_function};
 use cairo_lang_sierra::extensions::felt252::Felt252BinaryOperationConcrete;
 use cairo_lang_sierra::extensions::felt252::Felt252BinaryOperator;
 use cairo_lang_sierra::extensions::{core::CoreConcreteLibfunc, felt252::Felt252Concrete};
@@ -159,6 +159,7 @@ impl Felt252Overflow {
                 impact: self.impact(),
                 confidence: self.confidence(),
                 message: msg,
+                locations: statement_locations(compilation_unit, name, libfunc),
             });
         } else {
             let msg = format!(
@@ -172,6 +173,7 @@ impl Felt252Overflow {
                 impact: self.impact(),
                 confidence: self.confidence(),
                 message: msg,
+                locations: statement_locations(compilation_unit, name, libfunc),
             });
         }
     }

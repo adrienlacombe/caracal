@@ -5,7 +5,7 @@ use crate::analysis::taint::WrapperVariable;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::{Function, Type};
-use crate::utils::function_summary;
+use crate::utils::{function_locations, function_summary};
 use cairo_lang_sierra::extensions::array::ArrayConcreteLibfunc;
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreTypeConcrete};
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
@@ -193,6 +193,7 @@ impl Detector for UseAfterPopFront {
                         impact: self.impact(),
                         confidence: self.confidence(),
                         message,
+                        locations: function_locations(compilation_unit, &function.name()),
                     });
                 }
 
@@ -218,6 +219,7 @@ impl Detector for UseAfterPopFront {
                         impact: self.impact(),
                         confidence: self.confidence(),
                         message,
+                        locations: function_locations(compilation_unit, &function.name()),
                     });
                 }
             }

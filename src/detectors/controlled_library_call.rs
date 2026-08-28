@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::{filter_builtins_from_arguments, statement_summary_in_named_function};
+use crate::utils::{
+    filter_builtins_from_arguments, statement_locations, statement_summary_in_named_function,
+};
 use cairo_lang_sierra::extensions::{
     core::CoreConcreteLibfunc, lib_func::ParamSignature, starknet::StarknetConcreteLibfunc,
 };
@@ -116,6 +118,7 @@ impl ControlledLibraryCall {
                 impact: self.impact(),
                 confidence: self.confidence(),
                 message,
+                locations: statement_locations(compilation_unit, function_name, statement),
             });
         }
     }

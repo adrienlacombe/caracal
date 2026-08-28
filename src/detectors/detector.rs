@@ -1,4 +1,5 @@
 use crate::core::core_unit::CoreUnit;
+use crate::core::source_map::SourceLocation;
 
 use std::{collections::HashSet, fmt};
 
@@ -65,6 +66,13 @@ pub struct Result {
     pub name: String,
     pub confidence: Confidence,
     pub message: String,
+    /// Cairo source location(s) the finding points at, in message order —
+    /// e.g. reentrancy findings carry the external call first, then the
+    /// write/event. Empty when no source mapping is available (pre-built
+    /// artifacts) or the finding has no meaningful anchor. Kept as the last
+    /// field so the derived `Ord` still sorts findings by the pre-existing
+    /// fields first (snapshot order stability).
+    pub locations: Vec<SourceLocation>,
 }
 
 impl fmt::Display for Result {

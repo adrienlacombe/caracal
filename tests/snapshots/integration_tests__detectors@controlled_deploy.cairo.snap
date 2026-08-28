@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 23
 expression: results
 input_file: tests/detectors/controlled_deploy.cairo
 ---
@@ -10,11 +9,25 @@ input_file: tests/detectors/controlled_deploy.cairo
         name: "controlled-deploy",
         confidence: Medium,
         message: "deploy_syscall with user controlled class hash in controlled_deploy::controlled_deploy::DeployContract::bad_direct\n deploy_syscall (controlled_deploy.cairo:15)",
+        locations: [
+            SourceLocation {
+                file: "controlled_deploy.cairo",
+                line: 15,
+                col: 9,
+            },
+        ],
     },
     Result {
         impact: High,
         name: "controlled-deploy",
         confidence: Medium,
         message: "deploy_syscall with user controlled class hash in controlled_deploy::controlled_deploy::DeployContract::do_deploy\n deploy_syscall (controlled_deploy.cairo:28)",
+        locations: [
+            SourceLocation {
+                file: "controlled_deploy.cairo",
+                line: 28,
+                col: 9,
+            },
+        ],
     },
 ]

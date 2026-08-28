@@ -74,14 +74,14 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
             continue;
         };
         let Some(debug_info) = contract_class.sierra_program_debug_info else {
-            println!("Skipping analysing file {}. Debug info not found. Ensure in Scarb.toml you have \n[cairo]\nsierra-replace-ids = true\n", sierra_file.to_str().unwrap());
+            eprintln!("Skipping analysing file {}. Debug info not found. Ensure in Scarb.toml you have \n[cairo]\nsierra-replace-ids = true\n", sierra_file.to_str().unwrap());
             continue;
         };
         if debug_info.libfunc_names.is_empty()
             && debug_info.type_names.is_empty()
             && debug_info.user_func_names.is_empty()
         {
-            println!("Skipping analysing file {}. Debug info not found. If the file has code ensure in Scarb.toml you have \n[cairo]\nsierra-replace-ids = true\n", sierra_file.to_str().unwrap());
+            eprintln!("Skipping analysing file {}. Debug info not found. If the file has code ensure in Scarb.toml you have \n[cairo]\nsierra-replace-ids = true\n", sierra_file.to_str().unwrap());
             continue;
         }
 

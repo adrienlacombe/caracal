@@ -4,7 +4,9 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::{is_safe_external_call, statement_summary_in_named_function};
+use crate::utils::{
+    is_safe_external_call, statement_locations, statement_summary_in_named_function,
+};
 
 #[derive(Default)]
 pub struct ReentrancyEvents;
@@ -66,6 +68,18 @@ impl Detector for ReentrancyEvents {
                                     event.get_function(),
                                     event.get_event_emitted().as_ref().unwrap().get_statement(),
                                 );
+                                // Call first, then the emit — the order the
+                                // message mentions them in.
+                                let mut locations = statement_locations(
+                                    compilation_unit,
+                                    call.get_function(),
+                                    call.get_function_call().unwrap().get_statement(),
+                                );
+                                locations.extend(statement_locations(
+                                    compilation_unit,
+                                    event.get_function(),
+                                    event.get_event_emitted().as_ref().unwrap().get_statement(),
+                                ));
                                 results.insert(Result {
                                     name: self.name().to_string(),
                                     impact: self.impact(),
@@ -78,6 +92,7 @@ impl Detector for ReentrancyEvents {
                                         event_summary,
                                         event.get_function()
                                     ),
+                                    locations,
                                 });
                             }
                         }

@@ -141,6 +141,9 @@ impl Detector for UnusedEvents {
                         "Event {} defined in {} is never emitted",
                         event_name, event_declaration
                     ),
+                    // Event declarations have no sierra anchor to map to a
+                    // source location.
+                    locations: Vec::new(),
                 });
             }
         }

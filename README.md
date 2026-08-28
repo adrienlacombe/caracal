@@ -88,6 +88,23 @@ Run printers:
 caracal print path/to/dir --printer printer_to_use
 ```
 
+### Machine-readable output and CI
+`caracal detect` writes findings to stdout as colored text by default. `--format json` emits a flat JSON array of findings (`detector`, `impact`, `confidence`, `message`, `locations: [{file, line, col}]`), and `--format sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) document. Whatever the format, stdout carries only the findings document — compilation progress and warnings go to stderr — so the output can be piped or redirected directly. Location paths are relative to the analyzed target; findings are location-less when caracal analyzes pre-built artifacts (see the Limitations section).
+
+`--fail-on <impact>` makes the exit code CI-grade: caracal exits `1` when any finding has impact at or above the threshold (`high` > `medium` > `low` > `informational`), and `0` otherwise. Without the flag the exit code is `0` whatever is found. Exit code `2` means caracal itself failed to run (e.g. a compilation error). `--fail-on` works with every format.
+```bash
+caracal detect path/to/dir --format sarif --fail-on medium > results.sarif
+```
+Upload the SARIF to GitHub code scanning to get findings as annotations on pull requests:
+```yaml
+- name: Run caracal
+  run: caracal detect . --format sarif > results.sarif
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
+
 ## Detectors
 Num | Detector | What it Detects | Impact | Confidence | Cairo | Notes
 --- | --- | --- | --- | --- | --- | ---

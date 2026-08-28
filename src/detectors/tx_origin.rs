@@ -3,7 +3,7 @@ use crate::analysis::taint::WrapperVariable;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Function;
-use crate::utils::function_summary;
+use crate::utils::{function_locations, function_summary};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::felt252::Felt252Concrete;
 use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
@@ -100,6 +100,7 @@ impl Detector for TxOrigin {
                         impact: self.impact(),
                         confidence: self.confidence(),
                         message,
+                        locations: function_locations(compilation_unit, &function.name()),
                     });
                 }
             }
@@ -211,7 +212,7 @@ impl TxOrigin {
                                             id.try_into().unwrap(),
                                         )
                                     } else {
-                                        println!(
+                                        eprintln!(
                                             "tx_origin: Did not find sink id, id could be wrong."
                                         );
                                         // This is very likely to use a wrong var id

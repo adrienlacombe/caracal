@@ -1,0 +1,225 @@
+---
+source: tests/output_formats.rs
+expression: sarif
+---
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "caracal",
+          "informationUri": "https://github.com/crytic/caracal",
+          "version": "0.2.3",
+          "rules": [
+            {
+              "id": "use-after-pop-front",
+              "shortDescription": {
+                "text": "Detect use of an array or a span after removing element(s)"
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "controlled-library-call",
+              "shortDescription": {
+                "text": "Detect library calls with a user controlled class hash"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "controlled-replace-class",
+              "shortDescription": {
+                "text": "Detect replace_class_syscall with a user controlled class hash"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "controlled-deploy",
+              "shortDescription": {
+                "text": "Detect deploy_syscall with a user controlled class hash"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "controlled-l1-message",
+              "shortDescription": {
+                "text": "Detect send_message_to_l1_syscall with a user controlled to_address"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "unprotected-replace-class",
+              "shortDescription": {
+                "text": "Detect replace_class_syscall reachable from an external function without a caller address check"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "unchecked-transfer",
+              "shortDescription": {
+                "text": "Detect ERC20 transfer/transfer_from calls whose returned bool is ignored"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "unused-events",
+              "shortDescription": {
+                "text": "Detect events defined but not emitted"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "dead-code",
+              "shortDescription": {
+                "text": "Detect private functions never used"
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "unused-arguments",
+              "shortDescription": {
+                "text": "Detect unused arguments"
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "unused-return",
+              "shortDescription": {
+                "text": "Detect unused return values"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "reentrancy-benign",
+              "shortDescription": {
+                "text": "Detect when a storage variable is written after an external call but not read before"
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "reentrancy",
+              "shortDescription": {
+                "text": "Detect when a storage variable is read before an external call and written after"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "reentrancy-events",
+              "shortDescription": {
+                "text": "Detect when an event is emitted after an external call leading to out-of-order events"
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "read-only-reentrancy",
+              "shortDescription": {
+                "text": "Detect when a view function read a storage variable written after an external call"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "unchecked-l1-handler-from",
+              "shortDescription": {
+                "text": "Detect L1 handlers without from address check"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "felt252-unsafe-arithmetic",
+              "shortDescription": {
+                "text": "Detect felt252 arithmetic overflow/underflow with user-controlled params"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "tx-origin",
+              "shortDescription": {
+                "text": "Detect usage of the transaction origin address as access control"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "controlled-library-call",
+          "level": "error",
+          "message": {
+            "text": "Library call to user controlled class hash in controlled_library_call::controlled_library_call::TestContract::bad1\n controlled_library_call::controlled_library_call::IAnotherContractLibraryDispatcherImpl::foo (controlled_library_call.cairo:17)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "controlled_library_call.cairo"
+                },
+                "region": {
+                  "startLine": 17,
+                  "startColumn": 8
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "controlled-library-call",
+          "level": "error",
+          "message": {
+            "text": "Library call to user controlled class hash in controlled_library_call::controlled_library_call::TestContract::internal_lib_call\n controlled_library_call::controlled_library_call::IAnotherContractLibraryDispatcherImpl::foo (controlled_library_call.cairo:27)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "controlled_library_call.cairo"
+                },
+                "region": {
+                  "startLine": 27,
+                  "startColumn": 9
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

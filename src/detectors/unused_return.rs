@@ -4,7 +4,7 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Type;
-use crate::utils::{skip_bookkeeping, statement_summary_in_named_function};
+use crate::utils::{skip_bookkeeping, statement_locations, statement_summary_in_named_function};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::enm::EnumConcreteLibfunc;
 use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
@@ -85,7 +85,7 @@ impl Detector for UnusedReturn {
                                 }
                             } else {
                                 // Should never happen
-                                println!(
+                                eprintln!(
                                     "Unused-return: function not found {}",
                                     f_called.function.id.debug_name.clone().unwrap()
                                 );
@@ -118,6 +118,11 @@ impl Detector for UnusedReturn {
                                             statement_summary_in_named_function(compilation_unit, &f.name(), stmt),
                                             f.name()
                                         ),
+                                            locations: statement_locations(
+                                                compilation_unit,
+                                                &f.name(),
+                                                stmt,
+                                            ),
                                         });
                                     }
                                 } else if let CoreConcreteLibfunc::Struct(
@@ -234,6 +239,7 @@ impl<'a> UnusedReturn {
                         statement_summary_in_named_function(compilation_unit, function_name, stmt),
                         function_name
                     ),
+                    locations: statement_locations(compilation_unit, function_name, stmt),
                 });
             }
         }

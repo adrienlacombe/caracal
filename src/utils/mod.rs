@@ -1,6 +1,7 @@
 use crate::core::basic_block::BasicBlock;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
+use crate::core::source_map::SourceLocation;
 use cairo_lang_sierra::extensions::lib_func::{OutputVarInfo, ParamSignature};
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
@@ -429,6 +430,32 @@ pub fn function_summary(compilation_unit: &CompilationUnit, name: &str) -> Strin
         Some(location) => format!("{name} ({location})"),
         None => name.to_string(),
     }
+}
+
+/// Structured location of a statement for `detector::Result::locations`:
+/// zero-or-one element, mirroring the location
+/// `statement_summary_in_named_function` bakes into the message.
+pub fn statement_locations(
+    compilation_unit: &CompilationUnit,
+    owner: &str,
+    stmt: &SierraStatement,
+) -> Vec<SourceLocation> {
+    compilation_unit
+        .statement_location(owner, stmt)
+        .cloned()
+        .into_iter()
+        .collect()
+}
+
+/// Structured declaration site of a function for
+/// `detector::Result::locations`: zero-or-one element, mirroring the
+/// location `function_summary` bakes into the message.
+pub fn function_locations(compilation_unit: &CompilationUnit, name: &str) -> Vec<SourceLocation> {
+    compilation_unit
+        .function_location(name)
+        .cloned()
+        .into_iter()
+        .collect()
 }
 
 /// Compact human form of a `storage_statement_identity` /

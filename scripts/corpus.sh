@@ -186,12 +186,14 @@ fi
 # Strip the ANSI color codes caracal always emits.
 sed $'s/\x1b\[[0-9;]*m//g' "$RAW_OUT" >"$CLEAN_OUT"
 
-grep -q '^Compiling with Scarb\. Found Scarb\.toml\.$' "$CLEAN_OUT" \
-    || die "caracal did not take the Scarb compilation path — output starts with: $(head -n 1 "$CLEAN_OUT")"
+# Progress/diagnostic lines go to stderr (stdout is reserved for findings,
+# so `--format json|sarif` can own it).
+grep -q '^Compiling with Scarb\. Found Scarb\.toml\.$' "$RAW_ERR" \
+    || die "caracal did not take the Scarb compilation path — stderr starts with: $(head -n 1 "$RAW_ERR")"
 
 # --------------------------------------------------------------- summarize
 ARTIFACTS="$(find "$CORPUS/target/dev" -maxdepth 1 -name '*.contract_class.json' | wc -l | tr -d ' ')"
-SKIPPED="$(grep -c '^Skipping analysing' "$CLEAN_OUT" || true)"
+SKIPPED="$(grep -c '^Skipping analysing' "$RAW_ERR" || true)"
 ANALYZED="$((ARTIFACTS - SKIPPED))"
 [[ "$ANALYZED" -gt 0 ]] \
     || die "zero contracts analyzed (artifacts: $ARTIFACTS, skipped: $SKIPPED) — the classic silent-death mode"

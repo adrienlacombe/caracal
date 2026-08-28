@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::core_unit::CoreUnit;
-use crate::utils::{filter_builtins_from_arguments, statement_summary_in_named_function};
+use crate::utils::{
+    filter_builtins_from_arguments, statement_locations, statement_summary_in_named_function,
+};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::program::Statement as SierraStatement;
@@ -87,6 +89,7 @@ impl Detector for ControlledDeploy {
                                     stmt
                                 )
                             ),
+                            locations: statement_locations(compilation_unit, &f.name(), stmt),
                         });
                     }
                 }

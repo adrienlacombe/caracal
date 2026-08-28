@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 23
 expression: results
 input_file: tests/detectors/unused_events.cairo
 ---
@@ -10,5 +9,6 @@ input_file: tests/detectors/unused_events.cairo
         name: "unused-events",
         confidence: Medium,
         message: "Event MyUnusedEvent defined in unused_events::unused_events::UnusedEvents is never emitted",
+        locations: [],
     },
 ]

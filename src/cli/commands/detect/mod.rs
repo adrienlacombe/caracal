@@ -2,13 +2,51 @@ use super::Cmd;
 use caracal::{
     core::core_unit::{CoreOpts, CoreUnit},
     detectors::{detector::Impact, detector::Result, get_detectors},
+    output::{render_json, render_sarif},
 };
-use clap::{Args, ValueHint};
+use clap::{Args, ValueEnum, ValueHint};
 use std::io::Write;
 use std::path::PathBuf;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+/// How the findings are written to stdout. Whatever the format, stdout
+/// carries only the findings document: compilation progress and warnings go
+/// to stderr.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+enum OutputFormat {
+    /// Human-readable colored text (the default)
+    Text,
+    /// A JSON array of findings
+    Json,
+    /// A SARIF 2.1.0 document
+    Sarif,
+}
+
+/// Impact threshold for `--fail-on`, ordered most severe first.
+#[derive(Copy, Clone, Debug, ValueEnum)]
+enum FailOnImpact {
+    High,
+    Medium,
+    Low,
+    Informational,
+}
+
+impl From<FailOnImpact> for Impact {
+    fn from(level: FailOnImpact) -> Self {
+        match level {
+            FailOnImpact::High => Impact::High,
+            FailOnImpact::Medium => Impact::Medium,
+            FailOnImpact::Low => Impact::Low,
+            FailOnImpact::Informational => Impact::Informational,
+        }
+    }
+}
+
 #[derive(Args, Debug)]
+#[command(after_help = "Exit codes:
+  0    analysis ran (no --fail-on, or no finding at or above the threshold)
+  1    at least one finding has impact at or above the --fail-on threshold
+  2    caracal failed to run (compilation error, invalid target, ...)")]
 pub struct DetectArgs {
     /// Target to analyze
     #[arg(value_hint = ValueHint::FilePath)]
@@ -49,6 +87,16 @@ pub struct DetectArgs {
     /// Exclude detectors with high impact
     #[arg(long)]
     exclude_high: bool,
+
+    /// Output format for the findings on stdout
+    #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+    format: OutputFormat,
+
+    /// Exit with code 1 if any finding has impact at or above this threshold
+    /// (High > Medium > Low > Informational); without it the exit code is 0
+    /// whatever is found
+    #[arg(long, value_enum)]
+    fail_on: Option<FailOnImpact>,
 }
 
 impl From<&DetectArgs> for CoreOpts {
@@ -97,41 +145,67 @@ impl Cmd for DetectArgs {
             .collect::<Vec<Result>>();
         results.sort();
 
-        let mut stdout = StandardStream::stdout(ColorChoice::Always);
+        match self.format {
+            OutputFormat::Text => print_text(&results)?,
+            OutputFormat::Json => print_document(&render_json(&results))?,
+            OutputFormat::Sarif => print_document(&render_sarif(&results, &detectors))?,
+        }
 
-        for r in results.iter() {
-            match r.impact {
-                Impact::High => {
-                    stdout
-                        .set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_intense(true))?;
-                    writeln!(&mut stdout, "{}", r)?;
-                }
-                Impact::Medium => {
-                    stdout.set_color(
-                        ColorSpec::new()
-                            .set_fg(Some(Color::Yellow))
-                            .set_intense(true),
-                    )?;
-                    writeln!(&mut stdout, "{}", r)?;
-                }
-                Impact::Low => {
-                    stdout.set_color(
-                        ColorSpec::new()
-                            .set_fg(Some(Color::Green))
-                            .set_intense(true),
-                    )?;
-                    writeln!(&mut stdout, "{}", r)?;
-                }
-                Impact::Informational => {
-                    stdout
-                        .set_color(ColorSpec::new().set_fg(Some(Color::Cyan)).set_intense(true))?;
-                    writeln!(&mut stdout, "{}", r)?;
-                }
+        if let Some(threshold) = self.fail_on {
+            // `Impact`'s derived `Ord` follows declaration order, High first,
+            // so "at least as severe as the threshold" is `<=`.
+            if results.iter().any(|r| r.impact <= Impact::from(threshold)) {
+                std::process::exit(1);
             }
         }
 
-        stdout.reset()?;
-
         Ok(())
     }
+}
+
+/// Write a machine-readable document to stdout, flushed before any
+/// `--fail-on` exit can bypass buffered-writer destructors.
+fn print_document(document: &str) -> anyhow::Result<()> {
+    let mut stdout = std::io::stdout();
+    writeln!(stdout, "{}", document)?;
+    stdout.flush()?;
+    Ok(())
+}
+
+/// The default human-readable output: one colored block per finding.
+fn print_text(results: &[Result]) -> anyhow::Result<()> {
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+
+    for r in results.iter() {
+        match r.impact {
+            Impact::High => {
+                stdout.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_intense(true))?;
+                writeln!(&mut stdout, "{}", r)?;
+            }
+            Impact::Medium => {
+                stdout.set_color(
+                    ColorSpec::new()
+                        .set_fg(Some(Color::Yellow))
+                        .set_intense(true),
+                )?;
+                writeln!(&mut stdout, "{}", r)?;
+            }
+            Impact::Low => {
+                stdout.set_color(
+                    ColorSpec::new()
+                        .set_fg(Some(Color::Green))
+                        .set_intense(true),
+                )?;
+                writeln!(&mut stdout, "{}", r)?;
+            }
+            Impact::Informational => {
+                stdout.set_color(ColorSpec::new().set_fg(Some(Color::Cyan)).set_intense(true))?;
+                writeln!(&mut stdout, "{}", r)?;
+            }
+        }
+    }
+
+    stdout.reset()?;
+    stdout.flush()?;
+    Ok(())
 }

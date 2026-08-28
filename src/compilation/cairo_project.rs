@@ -60,7 +60,9 @@ fn local_compiler_fallback(
 }
 
 fn bundled_compiler(opts: CoreOpts, corelib: PathBuf) -> Result<Vec<ProgramCompiled>> {
-    println!(
+    // Progress goes to stderr: stdout is reserved for analysis output
+    // (machine-readable when `--format json|sarif`).
+    eprintln!(
         "Compiling with the bundled compiler {} (corelib: {})",
         current_compiler_version_id(),
         corelib.display()
