@@ -22,9 +22,16 @@ pub struct BasicBlock {
     event_emitted: Option<Instruction>,
 }
 
+// Identity is (function, id): block ids restart at 0 for every function, and
+// the reentrancy analysis mixes blocks from several functions in one
+// HashSet/HashMap (its private-call recursion flattens callees in). Eq MUST
+// match Hash below — an id-only Eq made same-id blocks from different
+// functions "equal" but differently hashed, so whether an insert deduped
+// depended on the per-process random hasher seed: finding counts drifted
+// between identical runs on identical sierra.
 impl PartialEq for BasicBlock {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.function == other.function && self.id == other.id
     }
 }
 

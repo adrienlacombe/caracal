@@ -158,9 +158,7 @@ impl ReentrancyAnalysis {
                                 inner_state.external_calls.insert(basic_block.clone());
                                 inner_state.variables_read_before_calls.insert(
                                     basic_block.clone(),
-                                    HashSet::from_iter(
-                                        inner_state.storage_variables_read.clone(),
-                                    ),
+                                    HashSet::from_iter(inner_state.storage_variables_read.clone()),
                                 );
                             }
                             StarknetConcreteLibfunc::EmitEvent(_)

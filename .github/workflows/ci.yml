@@ -47,8 +47,26 @@ jobs:
         environment: [ubuntu-latest, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.environment }}
-    
+
     steps:
       - uses: actions/checkout@v3
       - run: rustup update
       - run: cargo test
+
+  corpus:
+    name: OpenZeppelin corpus regression
+    runs-on: ubuntu-latest
+    env:
+      # This job builds OZ's Rust proc-macro package through scarb's cargo;
+      # -Dwarnings is not ours to enforce there (clippy covers this repo).
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+      # scripts/corpus.sh installs the pinned scarb itself (version pinned in
+      # the script, next to the pinned OZ tag), clones the corpus, runs
+      # caracal over it and fails on any drift from
+      # tests/corpus/expected_summary.txt.
+      - name: Run corpus regression check
+        run: ./scripts/corpus.sh

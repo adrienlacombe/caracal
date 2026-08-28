@@ -52,13 +52,13 @@ impl Detector for Reentrancy {
                                 continue;
                             }
 
-                            if let Some(current_vars_read_before_call) = reentrancy_info
-                                .variables_read_before_calls
-                                .iter()
-                                .find(|entry| entry.0.get_id() == call.get_id())
+                            // Keyed by the call's (function, id) identity; an
+                            // id-only search here used to pick an arbitrary
+                            // same-id block from another function.
+                            if let Some(current_vars_read_before_call) =
+                                reentrancy_info.variables_read_before_calls.get(call)
                             {
                                 let vars_read: Vec<String> = current_vars_read_before_call
-                                    .1
                                     .iter()
                                     .map(|var| {
                                         storage_variable_identity(

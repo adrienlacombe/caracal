@@ -24,6 +24,10 @@ cargo fmt --all             # rustfmt, checked in CI
 - Because every fixture runs every detector, adding a detector can legitimately change other fixtures' snapshots — check those diffs are expected findings, not regressions.
 - The harness sets `safe_external_calls: ["::safe_foo"]` — functions matching that selector are treated as safe external calls in reentrancy fixtures.
 
+## Real-world corpus regression (`scripts/corpus.sh`)
+
+The synthetic fixtures can't catch a compiler bump silently killing a detector on real code, so CI's `corpus` job (ubuntu only) runs caracal over a pinned checkout of openzeppelin/cairo-contracts and diffs the per-detector finding counts (zeros included) against `tests/corpus/expected_summary.txt`. Any drift, a caracal crash, or zero contracts analyzed fails the job. Run it locally with `scripts/corpus.sh` (self-contained: downloads the pinned scarb and clones the corpus into `~/.cache/caracal-corpus`, override with `CARACAL_CORPUS_CACHE`; pass a path to reuse an existing checkout). After an *intentional* change to detector behavior, regenerate with `scripts/corpus.sh --bless`, review the summary diff finding-by-finding like a snapshot, and commit it. The OZ tag and scarb version are pinned at the top of `scripts/corpus.sh` — bump them together with compiler upgrades, then re-bless. The script patches the corpus checkout's manifests (documented in the script). Corollary: detector output must be run-to-run deterministic — `BasicBlock`'s `Eq` and `Hash` are both keyed on (function, id) for exactly this reason; don't reintroduce id-only comparisons.
+
 ## Layout
 
 | Path | Purpose |
