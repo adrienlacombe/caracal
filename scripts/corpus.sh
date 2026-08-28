@@ -30,8 +30,9 @@
 # otherwise the pinned release tarball is downloaded into the cache dir.
 # caracal's Scarb compilation path shells out to `scarb` by name, so the
 # provisioned scarb is prepended to PATH for the caracal run. That path never
-# invokes `starknet-compile` (only the standalone/cairo-project paths prefer
-# a local starknet-compile binary), and the script asserts that the Scarb
+# invokes `starknet-compile` (the standalone/cairo-project paths use it only
+# as a last-resort fallback when no corelib resolves, and a corelib is
+# embedded in the caracal binary), and the script asserts that the Scarb
 # path was actually taken.
 
 set -euo pipefail

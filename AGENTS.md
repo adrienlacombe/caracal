@@ -40,7 +40,7 @@ The synthetic fixtures can't catch a compiler bump silently killing a detector o
 | `src/cli/` | clap-based CLI (`detect`, `print`, `detectors`, `printers` subcommands) |
 | `tests/detectors/` | Cairo fixtures, one per detector, named after the detector file |
 | `tests/snapshots/` | insta snapshots (committed) |
-| `corelib/` | Vendored Cairo corelib (version matches the pinned compiler) — do not modify; replace wholesale when bumping the compiler |
+| `corelib/` | Vendored Cairo corelib (version matches the pinned compiler) — do not modify; replace wholesale when bumping the compiler. `corelib/src` is also embedded into the binary at build time (`include_dir` in `src/compilation/corelib.rs`), so the CLI needs no corelib setup |
 
 ## Adding a detector
 
@@ -54,7 +54,7 @@ The synthetic fixtures can't catch a compiler bump silently killing a detector o
 ## Constraints and gotchas
 
 - **SIERRA-level only**: findings can't point at Cairo source locations, only at SIERRA functions/instructions. Don't promise source line numbers in messages.
-- **Inlining**: since commit `329fb95` caracal compiles source with `InliningStrategy::Avoid` (set in `src/compilation/{standard,cairo_project}.rs`), so user functions survive as separate, named SIERRA functions and detectors see real `FunctionCall` statements. The historical "inlined functions are not handled correctly" caveat now applies only to pre-inlined SIERRA input: Scarb artifacts built without `inlining-strategy = "avoid"` in `[cairo]`, and the local `starknet-compile` shell-out (no inlining flag). Keep the raw-syscall matching paths in detectors — they are what still works on that input.
+- **Inlining**: since commit `329fb95` caracal compiles source with `InliningStrategy::Avoid` (set in `src/compilation/{standard,cairo_project}.rs`), so user functions survive as separate, named SIERRA functions and detectors see real `FunctionCall` statements. The historical "inlined functions are not handled correctly" caveat now applies only to pre-inlined SIERRA input: Scarb artifacts built without `inlining-strategy = "avoid"` in `[cairo]`, and the `starknet-compile` shell-out (no inlining flag) — the latter is only a last-resort fallback: the bundled compiler runs whenever a corelib resolves (`--corelib` → `CORELIB_PATH` → the corelib embedded in the binary, extracted under the OS temp dir; see `src/compilation/corelib.rs`), and the fallback prints a degraded-analysis warning. Keep the raw-syscall matching paths in detectors — they are what still works on that input.
 - Compiler behavior changes across Cairo versions can silently neuter detectors. Precedent: `unused_arguments` went inert on Cairo ≥ 2.6 (documented in commit `61488ce`, revived by the inlining-avoid change in `329fb95` — it stays inert only on pre-inlined artifacts). `dead_code` is still inert: the compiler drops unreachable functions from SIERRA entirely. When a detector stops firing after a compiler bump, check codegen changes before assuming the detector is wrong, and document inert detectors in code comments rather than deleting them.
 - Some detectors are version-gated (README "Cairo" column, 1 vs 2). This fork targets Cairo 2.x.
 - `Cargo.lock` is committed (binary crate) — keep it in sync when touching `Cargo.toml`. Note the `starknet-types-core = "=0.1.7"` pin and its explanatory comment; don't bump it without checking the ARM build issue described there.

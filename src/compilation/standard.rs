@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use std::env;
+use std::path::PathBuf;
 use std::process;
 
 use cairo_lang_compiler::db::RootDatabase;
@@ -23,44 +23,55 @@ use crate::compilation::utils::replacer::SierraProgramDebugReplacer;
 use crate::core::core_unit::CoreOpts;
 
 pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
+    // The bundled in-process compiler (which avoids function inlining, giving
+    // the best detector results) is used whenever a corelib can be resolved:
+    // --corelib, CORELIB_PATH, or the corelib vendored into this binary. A
+    // local `starknet-compile` binary is only a last-resort fallback because
+    // it compiles with default aggressive inlining, degrading analysis.
+    match super::corelib::resolve(opts.corelib.as_ref()) {
+        Ok(corelib) => bundled_compiler(opts, corelib),
+        Err(corelib_err) => local_compiler_fallback(opts, corelib_err),
+    }
+}
+
+fn local_compiler_fallback(
+    opts: CoreOpts,
+    corelib_err: anyhow::Error,
+) -> Result<Vec<ProgramCompiled>> {
     let output = process::Command::new("starknet-compile")
         .arg("--version")
         .output();
 
-    if let Ok(result) = output {
-        if result.status.success() {
-            let version = String::from_utf8(result.stdout)?;
-            println!("Found local cairo installation {}", version);
-            // We have to check the version because if it's >= 2.1.0 the compiler needs --single-file flag
-            let version: Vec<&str> = version
-                .split_whitespace()
-                .nth(1)
-                .unwrap()
-                .split('.')
-                .collect();
-            if version[0] >= "2" && version[1] >= "1" {
-                return local_compiler(opts, true);
-            }
-
-            return local_compiler(opts, false);
-        }
-    }
-
-    println!(
-        "Local cairo installation not found. Compiling with starknet-compile {}",
-        current_compiler_version_id()
-    );
-
-    // corelib cli option has priority over the environment variable
-    let corelib = match opts.corelib {
-        Some(ref p) => p.clone(),
-        None => {
-            match env::var("CORELIB_PATH") {
-                Ok(p) => p.into(),
-                Err(e) => bail!("{e}. The Corelib path must be specified either with the CORELIB_PATH environment variable or the --corelib cli option"),
-            }
-        }
+    let version = match output {
+        Ok(result) if result.status.success() => String::from_utf8(result.stdout)?,
+        _ => bail!(
+            "Unable to compile: no corelib is available for the bundled compiler \
+             ({corelib_err}) and no local `starknet-compile` binary was found on PATH. \
+             Pass --corelib path/to/corelib/src or set the CORELIB_PATH environment \
+             variable (a matching corelib ships in the caracal repository under \
+             corelib/), or install a Cairo toolchain providing starknet-compile."
+        ),
     };
+
+    super::warn_local_compiler_fallback(&version, &corelib_err);
+
+    // We have to check the version because if it's >= 2.1.0 the compiler needs --single-file flag
+    let version: Vec<&str> = version
+        .split_whitespace()
+        .nth(1)
+        .unwrap()
+        .split('.')
+        .collect();
+    let single_file_flag = version[0] >= "2" && version[1] >= "1";
+    local_compiler(opts, single_file_flag)
+}
+
+fn bundled_compiler(opts: CoreOpts, corelib: PathBuf) -> Result<Vec<ProgramCompiled>> {
+    println!(
+        "Compiling with the bundled compiler {} (corelib: {})",
+        current_compiler_version_id(),
+        corelib.display()
+    );
 
     let mut db = RootDatabase::builder()
         .with_default_plugin_suite(starknet_plugin_suite())
@@ -123,6 +134,8 @@ pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
 // NOTE: the `starknet-compile` binary does not expose an inlining-strategy
 // flag, so this path compiles with the compiler's default (aggressive)
 // inlining and detectors relying on named user functions may miss findings.
+// It is only reached as a last-resort fallback when no corelib resolves
+// (see `compile` above), and a degraded-analysis warning has been printed.
 fn local_compiler(opts: CoreOpts, single_file_flag: bool) -> Result<Vec<ProgramCompiled>> {
     let output = if single_file_flag {
         process::Command::new("starknet-compile")

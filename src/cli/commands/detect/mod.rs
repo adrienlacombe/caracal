@@ -14,7 +14,7 @@ pub struct DetectArgs {
     #[arg(value_hint = ValueHint::FilePath)]
     target: PathBuf,
 
-    /// Corelib path (e.g. mypath/corelib/src)
+    /// Corelib path (e.g. mypath/corelib/src); overrides CORELIB_PATH and the corelib bundled into the binary
     #[arg(long)]
     corelib: Option<PathBuf>,
 

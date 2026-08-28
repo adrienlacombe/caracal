@@ -21,6 +21,9 @@ cairo-felt = "0.9.1"
 thiserror = "1.0.47"
 rayon = "1.8"
 fxhash = "0.2.1"
+# Embeds corelib/src into the binary so the bundled compiler works with no
+# --corelib / CORELIB_PATH setup (see src/compilation/corelib.rs).
+include_dir = "0.7"
 
 # Pinned to <0.1.8: newer versions depend on `size-of = "0.1.5"`, which fails
 # to build on current rustc for ARM targets (unsupported "fastcall"/"stdcall"
