@@ -6,6 +6,12 @@ input_file: tests/detectors/read_only_reentrancy.cairo
 ---
 [
     Result {
+        impact: Medium,
+        name: "read-only-reentrancy",
+        confidence: Medium,
+        message: "Read only reentrancy in read_only_reentrancy::read_only_reentrancy::TestContract::__wrapper__get_a\n\tExternal call call_contract_syscall([5], [2], [15], [25], [28]) { fallthrough([29], [30], [31]) 195([32], [33], [34]) } done in read_only_reentrancy::read_only_reentrancy::TestContract::__wrapper__bad\n\tVariable written after storage_write_syscall([29], [30], [38], [36], [37]) { fallthrough([39], [40]) 186([41], [42], [43]) } in read_only_reentrancy::read_only_reentrancy::TestContract::__wrapper__bad",
+    },
+    Result {
         impact: Low,
         name: "reentrancy-benign",
         confidence: Medium,

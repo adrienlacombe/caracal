@@ -3,7 +3,7 @@ use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Type;
-use crate::utils::is_safe_syscall;
+use crate::utils::{is_safe_syscall, storage_statement_identity};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -40,10 +40,10 @@ impl Detector for ReadOnlyReentrancy {
                 .filter(|f| f.ty() == &Type::View)
             {
                 for storage_var_read in f.storage_vars_read() {
-                    let var_read = storage_var_read
-                        .to_string()
-                        .rsplit_once("::")
-                        .map(|(p, _)| p.to_string())
+                    // Empty string when the variable couldn't be identified —
+                    // treated as a wildcard match below rather than dropping
+                    // the read on the floor.
+                    let var_read = storage_statement_identity(storage_var_read, f.get_statements())
                         .unwrap_or_default();
                     let functions_name = vars_read.entry(var_read).or_default();
                     functions_name.insert(f.name());
@@ -58,10 +58,8 @@ impl Detector for ReadOnlyReentrancy {
                     } = bb_info.1
                     {
                         for call in reentrancy_info.external_calls.iter() {
-                            let external_function_call = format!(
-                                "{}",
-                                call.get_function_call().unwrap().get_statement()
-                            );
+                            let external_function_call =
+                                format!("{}", call.get_function_call().unwrap().get_statement());
 
                             if let Some(safe_selectors) = core.get_safe_external_selectors() {
                                 if is_safe_syscall(call, f.get_statements(), safe_selectors) {
@@ -71,20 +69,37 @@ impl Detector for ReadOnlyReentrancy {
 
                             for written_variable in reentrancy_info.storage_variables_written.iter()
                             {
-                                let written_variable_name = written_variable
-                                    .get_storage_variable_written()
-                                    .as_ref()
-                                    .unwrap()
-                                    .get_statement()
-                                    .to_string()
-                                    .rsplit_once("::")
-                                    .map(|(p, _)| p.to_string())
+                                // The write may live in another function than
+                                // `f` (recorded through private-call recursion),
+                                // so trace it within its owning function's
+                                // statements.
+                                let written_variable_name = compilation_unit
+                                    .functions()
+                                    .find(|owner| owner.name() == written_variable.get_function())
+                                    .and_then(|owner| {
+                                        storage_statement_identity(
+                                            written_variable
+                                                .get_storage_variable_written()
+                                                .as_ref()
+                                                .unwrap()
+                                                .get_statement(),
+                                            owner.get_statements(),
+                                        )
+                                    })
                                     .unwrap_or_default();
 
-                                if vars_read.contains_key(&written_variable_name) {
-                                    for view_function in
-                                        vars_read.get(&written_variable_name).unwrap()
+                                for (read_variable_name, view_functions) in vars_read.iter() {
+                                    // Precise match when both identities are
+                                    // known; wildcard when either side is
+                                    // unknown (prefer over-reporting to losing
+                                    // the finding).
+                                    if !written_variable_name.is_empty()
+                                        && !read_variable_name.is_empty()
+                                        && *read_variable_name != written_variable_name
                                     {
+                                        continue;
+                                    }
+                                    for view_function in view_functions {
                                         results.insert(Result {
                                             name: self.name().to_string(),
                                             impact: self.impact(),
