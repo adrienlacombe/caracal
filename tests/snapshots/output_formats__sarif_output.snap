@@ -197,7 +197,10 @@ expression: sarif
                 }
               }
             }
-          ]
+          ],
+          "partialFingerprints": {
+            "caracalFingerprint/v1": "3c17c0997e17d739604c5b582df957c3a4a0cebf8d20426bd53560883212f6d0"
+          }
         },
         {
           "ruleId": "controlled-library-call",
@@ -217,7 +220,10 @@ expression: sarif
                 }
               }
             }
-          ]
+          ],
+          "partialFingerprints": {
+            "caracalFingerprint/v1": "e13f27cd4a1024850f27fa250ac03c2f542cc5362f392cef964f059d60f33db2"
+          }
         }
       ]
     }

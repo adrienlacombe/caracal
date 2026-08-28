@@ -98,6 +98,16 @@ struct SarifResult<'a> {
     /// without locations, and an empty array carries no information.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     locations: Vec<SarifLocation<'a>>,
+    /// The line-independent fingerprint the baseline feature matches on (see
+    /// `src/baseline.rs`), so SARIF consumers can track findings across runs.
+    #[serde(rename = "partialFingerprints")]
+    partial_fingerprints: SarifFingerprints,
+}
+
+#[derive(Serialize)]
+struct SarifFingerprints {
+    #[serde(rename = "caracalFingerprint/v1")]
+    caracal_v1: String,
 }
 
 #[derive(Serialize)]
@@ -174,6 +184,9 @@ pub fn render_sarif(results: &[Result], detectors: &[Box<dyn Detector>]) -> Stri
                     },
                 })
                 .collect(),
+            partial_fingerprints: SarifFingerprints {
+                caracal_v1: crate::baseline::fingerprint(r),
+            },
         })
         .collect();
 

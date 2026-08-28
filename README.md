@@ -105,6 +105,38 @@ Upload the SARIF to GitHub code scanning to get findings as annotations on pull 
     sarif_file: results.sarif
 ```
 
+### Configuration
+`caracal detect` options can be set in a `caracal.toml`. It is looked up next to the analyzed target (the target's directory, or the file's directory for a single-file target), then in the current working directory; `--config <path>` overrides discovery. Every key is optional, and unknown keys are a hard error so typos don't get silently ignored.
+
+```toml
+# caracal.toml — all keys optional
+safe_external_calls = ["::safe_foo"]          # mirrors --safe-external-calls
+detectors = ["reentrancy", "tx-origin"]       # mirrors --detect (run only these)
+# exclude_detectors = ["dead-code"]           # mirrors --exclude; mutually exclusive with `detectors`
+fail_on = "high"                              # mirrors --fail-on: high|medium|low|informational
+format = "sarif"                              # mirrors --format: text|json|sarif
+baseline = "caracal-baseline.json"            # mirrors --baseline; relative to this file's directory
+exclude_paths = ["tests/", "mocks/"]          # drop findings located under these paths
+```
+
+Precedence is CLI flag > config file > default, per setting — except detector selection, where the CLI flags (`--detect`, `--exclude`, `--exclude-*`) win as a group: passing any of them ignores both `detectors` and `exclude_detectors` from the config. Setting both `detectors` and `exclude_detectors` in the config is an error, the same mutual exclusion the CLI enforces for `--detect`/`--exclude`.
+
+`exclude_paths` drops findings whose first location's file path (relative to the analyzed target, `/`-separated) starts with any entry — a literal prefix match, so end an entry with `/` to match a whole directory. Findings without a source location are never path-filtered.
+
+### Baseline workflow
+Real codebases produce many pre-existing findings; the baseline lets CI fail only on new ones. Fingerprints are line-independent (they survive unrelated edits that shift line numbers) and stable across compiler bumps in the common case; findings identical up to line numbers and occurrence ordinals share a fingerprint, so baselining one suppresses its duplicates too. The same fingerprint is exposed in SARIF output as `partialFingerprints["caracalFingerprint/v1"]`.
+
+```bash
+# 1. See where you stand
+caracal detect .
+# 2. Accept the current findings
+caracal detect . --write-baseline           # writes caracal-baseline.json, exits 0
+# 3. In CI: report and gate on NEW findings only
+caracal detect . --baseline caracal-baseline.json --fail-on medium
+```
+
+Baselined findings are removed from the output and from `--fail-on` counting; a stderr line reports how many were suppressed. Commit the baseline file and regenerate it with `--write-baseline` whenever accepted findings are fixed or intentionally added.
+
 ## Detectors
 Num | Detector | What it Detects | Impact | Confidence | Cairo | Notes
 --- | --- | --- | --- | --- | --- | ---

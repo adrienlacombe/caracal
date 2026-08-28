@@ -22,6 +22,10 @@ cairo-felt = "0.9.1"
 thiserror = "1.0.47"
 rayon = "1.8"
 fxhash = "0.2.1"
+# Both already in the dependency tree via the cairo-lang-* crates; declaring
+# them adds no new transitive code.
+toml = "1"
+sha2 = "0.10"
 # Embeds corelib/src into the binary so the bundled compiler works with no
 # --corelib / CORELIB_PATH setup (see src/compilation/corelib.rs).
 include_dir = "0.7"
