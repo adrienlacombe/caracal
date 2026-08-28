@@ -1,10 +1,33 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 23
 expression: results
 input_file: tests/detectors/unused_arguments.cairo
 ---
 [
+    Result {
+        impact: Medium,
+        name: "felt252-unsafe-arithmetic",
+        confidence: Medium,
+        message: "The function unused_arguments::unused_arguments::UnusedArguments::comp_helper uses the felt252 operation core::Felt252Add::add, which is not overflow/underflow safe",
+    },
+    Result {
+        impact: Medium,
+        name: "felt252-unsafe-arithmetic",
+        confidence: Medium,
+        message: "The function unused_arguments::unused_arguments::UnusedArguments::helper uses the felt252 operation core::Felt252Add::add, which is not overflow/underflow safe",
+    },
+    Result {
+        impact: Medium,
+        name: "felt252-unsafe-arithmetic",
+        confidence: Medium,
+        message: "The function unused_arguments::unused_arguments::generic_unused::<core::integer::u128, core::integer::u128Drop> uses the felt252 operation core::Felt252Add::add, which is not overflow/underflow safe",
+    },
+    Result {
+        impact: Medium,
+        name: "unused-events",
+        confidence: Medium,
+        message: "Event Event defined in unused_arguments::unused_arguments::testcomp is never emitted",
+    },
     Result {
         impact: Low,
         name: "unused-arguments",

@@ -3,7 +3,7 @@
 # corpus: openzeppelin/cairo-contracts v4.0.1
 # scarb: 2.20.0
 contracts-analyzed: 96
-total-findings: 1826
+total-findings: 969
 controlled-deploy: 1
 controlled-l1-message: 0
 controlled-library-call: 0
@@ -18,7 +18,7 @@ tx-origin: 0
 unchecked-l1-handler-from: 0
 unchecked-transfer: 0
 unprotected-replace-class: 4
-unused-arguments: 892
+unused-arguments: 35
 unused-events: 12
 unused-return: 35
 use-after-pop-front: 1
