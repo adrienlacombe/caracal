@@ -1,0 +1,24 @@
+# caracal corpus summary — per-detector finding counts, zero included.
+# Regenerate with scripts/corpus.sh --bless after an intentional change.
+# corpus: EkuboProtocol/governance v2.8.0
+# scarb: 2.20.0
+contracts-analyzed: 5
+total-findings: 73
+controlled-deploy: 0
+controlled-l1-message: 1
+controlled-library-call: 0
+controlled-replace-class: 1
+dead-code: 0
+felt252-unsafe-arithmetic: 0
+read-only-reentrancy: 0
+reentrancy: 19
+reentrancy-benign: 21
+reentrancy-events: 17
+tx-origin: 0
+unchecked-l1-handler-from: 0
+unchecked-transfer: 3
+unprotected-replace-class: 0
+unused-arguments: 2
+unused-events: 0
+unused-return: 3
+use-after-pop-front: 6

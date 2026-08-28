@@ -196,6 +196,11 @@ fn compile_in_process(opts: &CoreOpts) -> Result<Vec<ProgramCompiled>> {
         bail!("no contract was found in any starknet-contract target");
     }
 
+    // Parsed by scripts/corpus.sh to pin the analyzed-contract count on
+    // in-process targets (the fallback path counts target/dev artifacts
+    // instead); keep the format stable.
+    eprintln!("Compiled {} contracts in-process", programs_compiled.len());
+
     Ok(programs_compiled)
 }
 

@@ -54,7 +54,7 @@ jobs:
       - run: cargo test
 
   corpus:
-    name: OpenZeppelin corpus regression
+    name: Corpus regression
     runs-on: ubuntu-latest
     env:
       # This job builds OZ's Rust proc-macro package through scarb's cargo;
@@ -65,9 +65,11 @@ jobs:
       - run: rustup update
       - uses: Swatinem/rust-cache@v2
       # scripts/corpus.sh installs the pinned scarb itself (version pinned in
-      # the script, next to the pinned OZ tag), clones the corpus, runs
-      # caracal over it and fails on any drift from
-      # tests/corpus/expected_summary.txt.
+      # the script, next to the pinned corpus tags), clones both corpus
+      # targets — openzeppelin/cairo-contracts (artifact-fallback Scarb path)
+      # and EkuboProtocol/governance (in-process Scarb path) — runs caracal
+      # over them, asserts each took its expected compilation path and fails
+      # on any drift from tests/corpus/expected_summary_*.txt.
       - name: Run corpus regression check
         run: ./scripts/corpus.sh
       # The in-process Scarb compilation test needs scarb on PATH, which the
