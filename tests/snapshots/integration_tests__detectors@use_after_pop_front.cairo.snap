@@ -45,7 +45,7 @@ input_file: tests/detectors/use_after_pop_front.cairo
         impact: Low,
         name: "use-after-pop-front",
         confidence: Medium,
-        message: "The arrays [13, 81] are used after removing elements from them in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::bad_multiple_arrays",
+        message: "The arrays [13, 77] are used after removing elements from them in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::bad_multiple_arrays",
     },
     Result {
         impact: Low,
@@ -87,6 +87,6 @@ input_file: tests/detectors/use_after_pop_front.cairo
         impact: Low,
         name: "use-after-pop-front",
         confidence: Medium,
-        message: "The spans [15, 84] are used after removing elements from them in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::bad_multiple_arrays_span",
+        message: "The spans [16, 15] are used after removing elements from them in the function use_after_pop_front::use_after_pop_front::UseAfterPopFront::bad_multiple_arrays_span",
     },
 ]
