@@ -94,7 +94,7 @@ impl Detector for UncheckedL1HandlerFrom {
                 if !from_checked {
                     let message = format!(
                         "The L1 handler function {} does not check the L1 from address",
-                        &f.name()
+                        f.name()
                     );
                     results.insert(Result {
                         name: self.name().to_string(),

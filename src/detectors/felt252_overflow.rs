@@ -106,7 +106,7 @@ impl Felt252Overflow {
             if compilation_unit.is_tainted(name.to_string(), param.clone())
                 && !tainted_by.contains(&param)
             {
-                let msg = format!("{},", &param);
+                let msg = format!("{},", param);
                 taints.push_str(&msg);
                 tainted_by.insert(param);
             }
@@ -117,7 +117,7 @@ impl Felt252Overflow {
         if tainted_by.is_empty() {
             let msg = format!(
                 "The function {} uses the felt252 operation {}, which is not overflow/underflow safe",
-                &name, libfunc
+                name, libfunc
             );
             results.insert(Result {
                 name: self.name().to_string(),
@@ -128,7 +128,7 @@ impl Felt252Overflow {
         } else {
             let msg = format!(
                     "The function {} uses the felt252 operation {} with the user-controlled parameters: {}, which is not overflow/underflow safe",
-                    &name,
+                    name,
                     libfunc,
                     taints
                 );

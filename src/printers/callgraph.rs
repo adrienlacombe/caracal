@@ -54,7 +54,7 @@ impl Printer for CallgraphPrinter {
             f.write_all(output.as_bytes()).unwrap();
             let message = format!(
                 "Call graph for module {} in file {}",
-                &module_name, &file_name
+                module_name, file_name
             );
             results.push(Result {
                 name: self.name().to_string(),
@@ -178,7 +178,7 @@ impl CallgraphPrinter {
                     &module_name
                 };
                 let formatted_module_name = format!("\"{}\"", name);
-                let cluster = format!("\"cluster_{}\"", &module_name);
+                let cluster = format!("\"cluster_{}\"", module_name);
                 let stmt = subgraph!(cluster; function_node, attr!("label",formatted_module_name));
                 tracked_fns.insert(func_name.to_string());
                 tracked_contracts.insert(module_name.clone(), stmt);
@@ -200,13 +200,13 @@ impl CallgraphPrinter {
             // Leave module name w/o quotes, we'll modify it when computing the subgraph name
             (
                 (&module_name).to_string(),
-                format!("\"{}\"", &exact_func_name),
+                format!("\"{}\"", exact_func_name),
             )
         } else {
             let (module_name, exact_func_name) = func_name.rsplit_once("::").unwrap();
             (
                 (&module_name).to_string(),
-                format!("\"{}\"", &exact_func_name),
+                format!("\"{}\"", exact_func_name),
             )
         }
     }

@@ -66,11 +66,8 @@ impl Detector for UseAfterPopFront {
                             // `Serde::deserialize` — which pops felt252s — into
                             // every entrypoint wrapper. Those are compiler
                             // plumbing, not user intent.
-                            let is_felt252_pop = invoc
-                                .libfunc_id
-                                .debug_name
-                                .as_ref()
-                                .is_some_and(|n| {
+                            let is_felt252_pop =
+                                invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
                                     n.ends_with("<felt252>") || n.contains("<core::felt252>")
                                 });
                             if is_felt252_pop {
@@ -136,12 +133,12 @@ impl Detector for UseAfterPopFront {
                         1 => format!(
                             "The array {:?} is used after removing elements from it in the function {}",
                             array_ids,
-                            &function.name()
+                            function.name()
                         ),
                         _ => format!(
                             "The arrays {:?} are used after removing elements from them in the function {}",
                             array_ids,
-                            &function.name()
+                            function.name()
                         )
                     };
                     results.insert(Result {
@@ -161,12 +158,12 @@ impl Detector for UseAfterPopFront {
                         1 => format!(
                             "The span {:?} is used after removing elements from it in the function {}",
                             span_ids,
-                            &function.name()
+                            function.name()
                         ),
                         _ => format!(
                             "The spans {:?} are used after removing elements from them in the function {}",
                             span_ids,
-                            &function.name()
+                            function.name()
                         )
                     };
                     results.insert(Result {
@@ -248,13 +245,12 @@ impl UseAfterPopFront {
                     // dispatcher impls, etc.). A loop body passes the array to
                     // its own next iteration — that's not a leak, just the
                     // normal consume pattern.
-                    CoreConcreteLibfunc::FunctionCall(call) => {
-                        call.function
-                            .id
-                            .debug_name
-                            .as_ref()
-                            .is_none_or(|n| *n != function.name())
-                    }
+                    CoreConcreteLibfunc::FunctionCall(call) => call
+                        .function
+                        .id
+                        .debug_name
+                        .as_ref()
+                        .is_none_or(|n| *n != function.name()),
                     // Handed directly to a syscall (call_contract, library_call,
                     // emit_event, …).
                     CoreConcreteLibfunc::Starknet(_) => true,

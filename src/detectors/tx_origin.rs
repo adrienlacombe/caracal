@@ -92,7 +92,7 @@ impl Detector for TxOrigin {
                 if tx_origin_used {
                     let message = format!(
                         "The transaction origin contract address is used in an access control check in the function {}",
-                        &function.name()
+                        function.name()
                     );
                     results.insert(Result {
                         name: self.name().to_string(),
