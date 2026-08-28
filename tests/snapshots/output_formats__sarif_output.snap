@@ -68,6 +68,42 @@ expression: sarif
               }
             },
             {
+              "id": "deploy-from-zero",
+              "shortDescription": {
+                "text": "Detect deploy_syscall with the deploy_from_zero flag enabled"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "block-values-for-randomness",
+              "shortDescription": {
+                "text": "Detect block timestamp/number used as a randomness source (hashed or reduced by modulo)"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "unchecked-zero-owner",
+              "shortDescription": {
+                "text": "Detect constructors storing a ContractAddress parameter without a zero-address check"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "privileged-write-no-event",
+              "shortDescription": {
+                "text": "Detect caller-gated external functions that write storage without emitting an event"
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
               "id": "unchecked-transfer",
               "shortDescription": {
                 "text": "Detect ERC20 transfer/transfer_from calls whose returned bool is ignored"

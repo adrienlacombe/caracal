@@ -167,6 +167,10 @@ Num | Detector | What it Detects | Impact | Confidence | Cairo | Notes
 17 | `unchecked-transfer` | ERC20 transfer/transfer_from calls whose returned bool is ignored | High | Medium | 2 |
 18 | `unprotected-replace-class` | replace_class_syscall reachable from an external function without a caller address check | High | Low | 2 |
 19 | `controlled-l1-message` | send_message_to_l1_syscall with a user controlled to_address | Medium | Medium | 2 |
+20 | `deploy-from-zero` | Deploy syscall with the deploy_from_zero flag enabled | Medium | Medium | 2 | note 5
+21 | `block-values-for-randomness` | Block timestamp/number used as a randomness source (hashed or reduced by modulo) | Medium | Low | 2 |
+22 | `unchecked-zero-owner` | Constructor storing a ContractAddress parameter without a zero-address check | Medium | Low | 2 | note 5
+23 | `privileged-write-no-event` | Caller-gated external function writing storage without emitting an event | Low | Low | 2 |
 
 The Cairo column represent the compiler version(s) for which the detector is valid.
 
@@ -175,6 +179,7 @@ Status notes:
 2. `unused-arguments` works when caracal compiles your source with its bundled compiler (the standalone-file, cairo-project and in-process Scarb flows). It is inert on SIERRA produced with default aggressive inlining — pre-built Scarb artifacts (the Scarb fallback path) unless the project sets `inlining-strategy = "avoid"`, and the last-resort `starknet-compile` fallback — because the user's declared parameters do not survive into that SIERRA as first-class parameters.
 3. `unused-return`, `unused-arguments` and other detectors that match named function calls are inlining-sensitive: when analyzing pre-built Scarb artifacts (the Scarb fallback path), detection quality depends on how the artifact was compiled. Set `inlining-strategy = "avoid"` under `[cairo]` in Scarb.toml (see the Scarb usage section). Source analysis via the bundled compiler always uses inlining avoided.
 4. `unenforced-view` targets Cairo 1 only (the v0 `#[view]` attribute era) and is not included in this fork's build — the detector was removed upstream when Cairo 2 support landed. For Cairo 1 projects use upstream v0.1.x.
+5. `deploy-from-zero` and `unchecked-zero-owner` deliberately under-report when the relevant value is not statically visible: a `deploy_from_zero` flag that is not a compile-time literal is not flagged, and on pre-built artifacts (the Scarb fallback path) `unchecked-zero-owner` only sees constructors whose body survives default inlining as a named function with typed parameters (common in practice; a fully-inlined constructor is skipped).
 
 ## Printers
 - `cfg`: Export the CFG of each function to a .dot file

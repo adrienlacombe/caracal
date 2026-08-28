@@ -1,12 +1,19 @@
+use crate::analysis::taint::WrapperVariable;
 use crate::core::basic_block::BasicBlock;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
+use crate::core::function::Function;
 use crate::core::source_map::SourceLocation;
+use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
+use cairo_lang_sierra::extensions::felt252::Felt252Concrete;
 use cairo_lang_sierra::extensions::lib_func::{OutputVarInfo, ParamSignature};
+use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
+use fxhash::FxHashSet;
 use num_bigint::BigInt;
 use num_traits::Num;
+use std::collections::HashSet;
 
 pub const BUILTINS: [&str; 8] = [
     "Pedersen",
@@ -107,6 +114,55 @@ pub fn trace_const_felt252(statements: &[SierraStatement], mut var_id: u64) -> O
                 BigInt::from_str_radix(hex, 16).ok()
             } else {
                 BigInt::from_str_radix(value, 10).ok()
+            };
+        }
+        if name.starts_with("store_temp<")
+            || name.starts_with("rename<")
+            || name.starts_with("dup<")
+        {
+            var_id = producer.args.first()?.id;
+            continue;
+        }
+        return None;
+    }
+    None
+}
+
+/// Trace a sierra variable of type `core::bool` within a function's
+/// statements back to the constant that produced it, if any. Booleans in
+/// sierra are enums: a literal `true`/`false` is an
+/// `enum_init<core::bool, 1|0>` over the unit struct when the source is
+/// compiled by caracal, or a `const_as_immediate<Const<core::bool, 1|0, …>>`
+/// in pre-built artifacts. Follows the forwarding libfuncs (`store_temp`,
+/// `rename`, `dup`) like [`trace_const_felt252`]. Returns `None` when the
+/// value is not a compile-time constant (e.g. it comes from calldata or a
+/// comparison).
+pub fn trace_const_bool(statements: &[SierraStatement], mut var_id: u64) -> Option<bool> {
+    for _ in 0..256 {
+        let producer = statements.iter().find_map(|stmt| match stmt {
+            SierraStatement::Invocation(invoc)
+                if invoc
+                    .branches
+                    .iter()
+                    .any(|b| b.results.iter().any(|r| r.id == var_id)) =>
+            {
+                Some(invoc)
+            }
+            _ => None,
+        })?;
+        let name = producer.libfunc_id.debug_name.as_ref()?.as_str();
+        let variant = name
+            .strip_prefix("enum_init<core::bool, ")
+            .and_then(|rest| rest.strip_suffix('>'))
+            .or_else(|| {
+                name.strip_prefix("const_as_immediate<Const<core::bool, ")
+                    .and_then(|rest| rest.split([',', '>']).next())
+            });
+        if let Some(variant) = variant {
+            return match variant {
+                "0" => Some(false),
+                "1" => Some(true),
+                _ => None,
             };
         }
         if name.starts_with("store_temp<")
@@ -470,6 +526,214 @@ pub fn storage_identity_pretty(identity: &str) -> Option<String> {
         return None;
     }
     Some(format!("Storage variable #{index} of {contract}"))
+}
+
+/// True when `predicate` holds for `function` or any function reachable from
+/// it through private/loop calls. Each function is visited once per `visited`
+/// set, so recursive call graphs terminate.
+pub fn call_tree_any(
+    compilation_unit: &CompilationUnit,
+    function: &Function,
+    visited: &mut HashSet<String>,
+    predicate: &mut dyn FnMut(&Function) -> bool,
+) -> bool {
+    if !visited.insert(function.name()) {
+        return false;
+    }
+    if predicate(function) {
+        return true;
+    }
+    function
+        .private_functions_calls()
+        .chain(function.loop_functions_calls())
+        .any(|s| {
+            let GenStatement::Invocation(invoc) = s else {
+                return false;
+            };
+            let libfunc = compilation_unit
+                .registry()
+                .get_libfunc(&invoc.libfunc_id)
+                .expect("Library function not found in the registry");
+            let CoreConcreteLibfunc::FunctionCall(f_called) = libfunc else {
+                return false;
+            };
+            compilation_unit
+                .function_by_name(f_called.function.id.debug_name.as_ref().unwrap())
+                .is_some_and(|callee| call_tree_any(compilation_unit, callee, visited, predicate))
+        })
+}
+
+/// True when a caller-address read in this function (or one flowing in from
+/// the caller's frame through `caller_sources`) reaches an equality check,
+/// here or in a callee — the access-control recognition shared by
+/// `unprotected-replace-class` and `privileged-write-no-event`.
+///
+/// A "caller check" is a read of the caller address — a `FunctionCall` to
+/// `core::starknet::info::get_caller_address` / `get_execution_info`
+/// (inlining avoided) or a raw `get_execution_info*_syscall` libfunc
+/// (pre-inlined artifacts) — whose result flows (taint) into an equality
+/// check: a `core::...PartialEq::{eq,ne}` call (inlining avoided) or a raw
+/// `felt252_is_zero` (pre-inlined artifacts). New caller-address reads are
+/// collected in every visited function so modifier-style helpers (get the
+/// caller and compare it in the same private function) are recognized, and
+/// caller-derived values passed as call arguments are mapped positionally to
+/// the callee's formal parameters (mirroring `unchecked_l1_handler_from`).
+pub fn is_caller_checked(
+    caller_sources: &FxHashSet<WrapperVariable>,
+    compilation_unit: &CompilationUnit,
+    function: &Function,
+    checked_functions: &mut HashSet<String>,
+) -> bool {
+    let mut sources = caller_sources.clone();
+
+    // Collect caller-address reads local to this function. Builtins are
+    // filtered from the results so the GasBuiltin/System outputs don't
+    // taint unrelated computations.
+    for stmt in function.get_statements().iter() {
+        let SierraStatement::Invocation(invoc) = stmt else {
+            continue;
+        };
+        let libfunc = compilation_unit
+            .registry()
+            .get_libfunc(&invoc.libfunc_id)
+            .expect("Library function not found in the registry");
+
+        let output_infos = match libfunc {
+            CoreConcreteLibfunc::FunctionCall(f_called) => {
+                let callee = f_called
+                    .function
+                    .id
+                    .debug_name
+                    .as_ref()
+                    .map(|n| n.as_str())
+                    .unwrap_or_default();
+                if callee == "core::starknet::info::get_caller_address"
+                    || callee == "core::starknet::info::get_execution_info"
+                {
+                    Some(&f_called.signature.branch_signatures[0].vars)
+                } else {
+                    None
+                }
+            }
+            CoreConcreteLibfunc::Starknet(
+                StarknetConcreteLibfunc::GetExecutionInfo(g)
+                | StarknetConcreteLibfunc::GetExecutionInfoV2(g)
+                | StarknetConcreteLibfunc::GetExecutionInfoV3(g),
+            ) => Some(&g.signature.branch_signatures[0].vars),
+            _ => None,
+        };
+
+        if let (Some(output_infos), Some(branch)) = (output_infos, invoc.branches.first()) {
+            for var in filter_builtins_from_returns(output_infos, branch.results.clone()) {
+                sources.insert(WrapperVariable::new(function.name(), var.id));
+            }
+        }
+    }
+
+    // Check whether any equality check in this function is tainted by a
+    // caller-address read.
+    let checked_locally = function
+        .get_statements()
+        .iter()
+        .filter_map(|stmt| match stmt {
+            SierraStatement::Invocation(invoc) => Some(invoc),
+            _ => None,
+        })
+        .any(|invoc| {
+            let libfunc = compilation_unit
+                .registry()
+                .get_libfunc(&invoc.libfunc_id)
+                .expect("Library function not found in the registry");
+
+            match libfunc {
+                // Pre-inlined artifacts: comparisons boil down to a raw
+                // felt252_is_zero on the difference.
+                CoreConcreteLibfunc::Felt252(Felt252Concrete::IsZero(_)) => {
+                    let taint = compilation_unit.get_taint(&function.name()).unwrap();
+                    let sink = WrapperVariable::new(function.name(), invoc.args[0].id);
+                    taint.taints_any_sources(&sources, &sink)
+                }
+                // With inlining avoided an equality check is a call into
+                // a corelib PartialEq impl.
+                CoreConcreteLibfunc::FunctionCall(f_called) => {
+                    let callee = f_called
+                        .function
+                        .id
+                        .debug_name
+                        .as_ref()
+                        .map(|n| n.as_str())
+                        .unwrap_or_default();
+                    if callee.starts_with("core::")
+                        && (callee.ends_with("PartialEq::eq") || callee.ends_with("PartialEq::ne"))
+                    {
+                        let taint = compilation_unit.get_taint(&function.name()).unwrap();
+                        invoc.args.iter().any(|arg| {
+                            taint.taints_any_sources(
+                                &sources,
+                                &WrapperVariable::new(function.name(), arg.id),
+                            )
+                        })
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            }
+        });
+
+    if checked_locally {
+        return true;
+    }
+
+    // Recurse into private/loop calls, mapping the caller-derived
+    // variables used as call arguments to the callee's formal parameters
+    // by position.
+    function
+        .private_functions_calls()
+        .chain(function.loop_functions_calls())
+        .any(|s| {
+            let GenStatement::Invocation(invoc) = s else {
+                return false;
+            };
+            let libfunc = compilation_unit
+                .registry()
+                .get_libfunc(&invoc.libfunc_id)
+                .expect("Library function not found in the registry");
+            let CoreConcreteLibfunc::FunctionCall(f_called) = libfunc else {
+                return false;
+            };
+            let Some(callee) = compilation_unit
+                .function_by_name(f_called.function.id.debug_name.as_ref().unwrap())
+            else {
+                return false;
+            };
+            if !checked_functions.insert(callee.name()) {
+                return false;
+            }
+
+            let taint = compilation_unit.get_taint(&function.name()).unwrap();
+            let sinks: FxHashSet<WrapperVariable> = invoc
+                .args
+                .iter()
+                .map(|v| WrapperVariable::new(function.name(), v.id))
+                .collect();
+            let callee_params: Vec<u64> = callee.params_all().map(|p| p.id.id).collect();
+
+            let mapped_sources: FxHashSet<WrapperVariable> = sources
+                .iter()
+                .flat_map(|source| taint.taints_any_sinks_variable(source, &sinks))
+                .filter_map(|sink| {
+                    invoc
+                        .args
+                        .iter()
+                        .position(|a| a.id == sink.variable())
+                        .and_then(|pos| callee_params.get(pos))
+                        .map(|param| WrapperVariable::new(callee.name(), *param))
+                })
+                .collect();
+
+            is_caller_checked(&mapped_sources, compilation_unit, callee, checked_functions)
+        })
 }
 
 /// Get a number as input and return the ordinal representation

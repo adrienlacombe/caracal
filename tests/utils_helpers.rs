@@ -22,7 +22,7 @@ use caracal::core::function::Function;
 use caracal::utils::{
     is_safe_external_call, number_to_ordinal, skip_bookkeeping, statement_summary,
     statement_summary_in_function, statement_summary_in_named_function, storage_identity_pretty,
-    storage_statement_identity, trace_const_felt252, trace_storage_base_address,
+    storage_statement_identity, trace_const_bool, trace_const_felt252, trace_storage_base_address,
     trace_storage_base_member,
 };
 use num_bigint::BigInt;
@@ -71,6 +71,12 @@ mod UtilsFixture {
     #[external(v0)]
     fn call_safe(ref self: ContractState, address: ContractAddress) {
         IOtherDispatcher { contract_address: address }.safe_foo(3);
+    }
+
+    #[external(v0)]
+    fn deploy_true(ref self: ContractState, h: starknet::class_hash::ClassHash) {
+        let calldata: Array<felt252> = array![];
+        starknet::syscalls::deploy_syscall(h, 0, calldata.span(), true).unwrap();
     }
 }
 "#;
@@ -165,6 +171,29 @@ fn trace_const_felt252_recovers_written_literal() {
     // felt252 const.
     let base_var = &invoc.args[invoc.args.len() - 2];
     assert_eq!(trace_const_felt252(f.get_statements(), base_var.id), None);
+}
+
+#[test]
+fn trace_const_bool_recovers_literal_flag() {
+    let core = compile_fixture("const-bool");
+    let unit = compilation_unit(&core);
+    let f = function_ending_with(unit, "::UtilsFixture::deploy_true");
+
+    // The last argument of deploy_syscall is the deploy_from_zero bool: the
+    // fixture passes the literal `true`, which in sierra is an
+    // `enum_init<core::bool, 1>` reached through forwarding moves.
+    let deploys = statements_matching(f, "deploy_syscall", "");
+    assert_eq!(deploys.len(), 1, "one deploy_syscall in deploy_true");
+    let invoc = invocation_of(deploys[0]);
+    let flag_var = invoc.args.last().unwrap();
+    assert_eq!(
+        trace_const_bool(f.get_statements(), flag_var.id),
+        Some(true)
+    );
+
+    // The class hash comes from calldata — not a compile-time bool (or a
+    // bool at all).
+    assert_eq!(trace_const_bool(f.get_statements(), invoc.args[2].id), None);
 }
 
 #[test]

@@ -1,0 +1,33 @@
+---
+source: tests/integration_tests.rs
+expression: results
+input_file: tests/detectors/unchecked_zero_owner.cairo
+---
+[
+    Result {
+        impact: Medium,
+        name: "unchecked-zero-owner",
+        confidence: Low,
+        message: "The 1st parameter (a ContractAddress) is written to storage without a zero-address check in the constructor unchecked_zero_owner::unchecked_zero_owner::BadOwner::constructor (unchecked_zero_owner.cairo:13)",
+        locations: [
+            SourceLocation {
+                file: "unchecked_zero_owner.cairo",
+                line: 13,
+                col: 5,
+            },
+        ],
+    },
+    Result {
+        impact: Medium,
+        name: "unchecked-zero-owner",
+        confidence: Low,
+        message: "The 1st parameter (a ContractAddress) is written to storage without a zero-address check in the constructor unchecked_zero_owner::unchecked_zero_owner::BadOwnerIndirect::constructor (unchecked_zero_owner.cairo:30)",
+        locations: [
+            SourceLocation {
+                file: "unchecked_zero_owner.cairo",
+                line: 30,
+                col: 5,
+            },
+        ],
+    },
+]
