@@ -8,11 +8,26 @@ use cairo_lang_sierra::program::{
 };
 use cairo_lang_sierra::program_registry::ProgramRegistry;
 use cairo_lang_starknet_classes::abi::{
-    Contract, Item::Function as AbiFunction, Item::Interface as AbiInterface,
-    Item::L1Handler as AbiL1Handler,
+    Contract, EventFieldKind, EventKind, Item::Event as AbiEvent, Item::Function as AbiFunction,
+    Item::Interface as AbiInterface, Item::L1Handler as AbiL1Handler,
 };
 use fxhash::FxHashSet;
 use std::collections::{HashMap, HashSet};
+
+/// One variant of an ABI event enum, i.e. one emittable event.
+pub struct DeclaredEvent {
+    /// Full path of the event enum the variant belongs to
+    pub enum_path: String,
+    /// Index of the variant within the enum — matches the index in the
+    /// sierra `enum_init<enum_path, index>` that constructs it
+    pub variant_index: usize,
+    /// Total number of variants in the enum (flat ones included)
+    pub enum_size: usize,
+    /// Variant name; `starknet_keccak` of it is the emitted selector key
+    pub variant_name: String,
+    /// Full path of the variant's event struct type, used for reporting
+    pub ty: String,
+}
 
 pub struct CompilationUnit {
     /// The compiled sierra program
@@ -67,16 +82,38 @@ impl CompilationUnit {
         self.functions.iter().find(|f| f.name().as_str() == name)
     }
 
-    /// Returns all events name
-    pub fn all_events_name(&self) -> impl Iterator<Item = String> + '_ {
-        self.functions
-            .iter()
-            .filter(|f| {
-                f.name().ends_with("::append_keys_and_data")
-                    && !f.name().contains("::EventIsEvent::") // EventIsEvent represents the enum Event that contains the events so we discard it
+    /// Declared events, read from the ABI's event-enum items. (The old
+    /// implementation scanned for the derived `*IsEvent::append_keys_and_data`
+    /// sierra functions, which the compiler inlines away since cairo 2.6.)
+    /// Flat variants are skipped — their selector comes from the inner enum's
+    /// own variants, not from this variant's name.
+    pub fn declared_events(&self) -> Vec<DeclaredEvent> {
+        self.abi
+            .clone()
+            .into_iter()
+            .filter_map(|item| match item {
+                AbiEvent(e) => match e.kind {
+                    EventKind::Enum { variants } => Some((e.name, variants)),
+                    _ => None,
+                },
+                _ => None,
             })
-            // We discard IsEvent to have only the events' name e.g. MyEventIsEvent -> MyEvent
-            .map(|event| event.name().rsplit_once("IsEvent::").unwrap().0.to_owned())
+            .flat_map(|(enum_path, variants)| {
+                let enum_size = variants.len();
+                variants
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, v)| v.kind == EventFieldKind::Nested)
+                    .map(move |(variant_index, v)| DeclaredEvent {
+                        enum_path: enum_path.clone(),
+                        variant_index,
+                        enum_size,
+                        variant_name: v.name,
+                        ty: v.ty,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
     }
 
     pub fn registry(&self) -> &ProgramRegistry<CoreType, CoreLibfunc> {
@@ -217,9 +254,7 @@ impl CompilationUnit {
                                     }
                                 };
                             }
-                            AbiL1Handler(l1h) if l1h.name == inner_name => {
-                                return Type::L1Handler
-                            }
+                            AbiL1Handler(l1h) if l1h.name == inner_name => return Type::L1Handler,
                             _ => {}
                         }
                     }
