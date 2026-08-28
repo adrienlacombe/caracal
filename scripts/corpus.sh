@@ -34,6 +34,11 @@
 # as a last-resort fallback when no corelib resolves, and a corelib is
 # embedded in the caracal binary), and the script asserts that the Scarb
 # path was actually taken.
+#
+# NOTE: OZ v4 depends on Rust proc macros (openzeppelin_macros,
+# snforge_scarb_plugin), so caracal takes its Scarb ARTIFACT FALLBACK path
+# here — the in-process Scarb path is exercised by the gated
+# tests/scarb_inprocess.rs in CI instead.
 
 set -euo pipefail
 
@@ -56,7 +61,7 @@ for arg in "$@"; do
     case "$arg" in
         --bless) BLESS=1 ;;
         -h|--help)
-            sed -n '2,36p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+            sed -n '2,41p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         -*) die "unknown flag: $arg" ;;

@@ -26,6 +26,8 @@ fxhash = "0.2.1"
 # them adds no new transitive code.
 toml = "1"
 sha2 = "0.10"
+# Also already in the tree (CrateSettings::version is a semver::Version).
+semver = "1"
 # Embeds corelib/src into the binary so the bundled compiler works with no
 # --corelib / CORELIB_PATH setup (see src/compilation/corelib.rs).
 include_dir = "0.7"
@@ -39,6 +41,7 @@ starknet-types-core = { version = "=0.1.7", features = ["hash", "prime-bigint", 
 cairo-lang-compiler = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
 cairo-lang-defs = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
 cairo-lang-plugins = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-project = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
 cairo-lang-starknet = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
 cairo-lang-starknet-classes = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
 cairo-lang-filesystem = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }

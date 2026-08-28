@@ -67,7 +67,15 @@ Run printers:
 caracal print path/to/dir --printer printer_to_use
 ```
 ### Scarb
-If you have a project that uses Scarb you need to add the following in Scarb.toml:
+By default caracal compiles a Scarb project's **sources in-process** with its bundled compiler: it reads the project layout from `scarb metadata` (crate roots, editions, cfg, dependencies of every starknet-contract target, workspaces included) and compiles like the standalone/cairo-project flows — function inlining avoided and Cairo source locations in findings. Scarb only provides the metadata; your `[cairo]` profile settings do not affect the analysis.
+
+Caracal falls back to analyzing the pre-built artifacts of a full `scarb build` (with a note on stderr explaining why) when in-process compilation is not feasible:
+- a compilation unit uses Cairo plugins the bundled compiler cannot expand — above all Rust procedural macros (e.g. OpenZeppelin cairo-contracts v4+, snforge plugins), which require Scarb's proc-macro infrastructure;
+- a starknet-contract target uses `build-external-contracts`;
+- `scarb metadata` fails or its output cannot be parsed (scarb too old), or no corelib resolves for the bundled compiler;
+- the in-process compilation itself errors.
+
+On the fallback path findings carry no source locations, and analysis quality depends on how the artifacts were compiled, so add the following in Scarb.toml:
 ```bash
 [[target.starknet-contract]]
 sierra = true
@@ -76,7 +84,7 @@ sierra = true
 sierra-replace-ids = true
 inlining-strategy = "avoid"
 ```
-`sierra-replace-ids` is required. `inlining-strategy = "avoid"` is strongly recommended: caracal analyzes the pre-built artifacts Scarb produces, and with Scarb's default (aggressive) inlining several detectors degrade or go inert because the named function calls they match on are inlined away (see the notes under the detectors table).
+`sierra-replace-ids` is required. `inlining-strategy = "avoid"` is strongly recommended: with Scarb's default (aggressive) inlining several detectors degrade or go inert because the named function calls they match on are inlined away (see the notes under the detectors table). Neither setting matters for the in-process path.
 
 Then pass the path to the directory where Scarb.toml resides.
 Run detectors:
@@ -164,8 +172,8 @@ The Cairo column represent the compiler version(s) for which the detector is val
 
 Status notes:
 1. `dead-code` is inert on Cairo >= 2.6: the compiler removes unreachable functions from the SIERRA program before caracal sees it, so there is no dead code left to detect (see the comment in `tests/detectors/dead_code.cairo`). The detector stays registered in case future compiler versions change this.
-2. `unused-arguments` works when caracal compiles your source with its bundled compiler (the standalone-file and cairo-project flows). It is inert on SIERRA produced with default aggressive inlining — pre-built Scarb artifacts unless the project sets `inlining-strategy = "avoid"`, and the last-resort `starknet-compile` fallback — because the user's declared parameters do not survive into that SIERRA as first-class parameters.
-3. `unused-return`, `unused-arguments` and other detectors that match named function calls are inlining-sensitive: when analyzing pre-built Scarb artifacts, detection quality depends on how the artifact was compiled. Set `inlining-strategy = "avoid"` under `[cairo]` in Scarb.toml (see the Scarb usage section). Source analysis via the bundled compiler always uses inlining avoided.
+2. `unused-arguments` works when caracal compiles your source with its bundled compiler (the standalone-file, cairo-project and in-process Scarb flows). It is inert on SIERRA produced with default aggressive inlining — pre-built Scarb artifacts (the Scarb fallback path) unless the project sets `inlining-strategy = "avoid"`, and the last-resort `starknet-compile` fallback — because the user's declared parameters do not survive into that SIERRA as first-class parameters.
+3. `unused-return`, `unused-arguments` and other detectors that match named function calls are inlining-sensitive: when analyzing pre-built Scarb artifacts (the Scarb fallback path), detection quality depends on how the artifact was compiled. Set `inlining-strategy = "avoid"` under `[cairo]` in Scarb.toml (see the Scarb usage section). Source analysis via the bundled compiler always uses inlining avoided.
 4. `unenforced-view` targets Cairo 1 only (the v0 `#[view]` attribute era) and is not included in this fork's build — the detector was removed upstream when Cairo 2 support landed. For Cairo 1 projects use upstream v0.1.x.
 
 ## Printers
@@ -178,6 +186,6 @@ Check the wiki on the following topics:
   * [How to write a printer](https://github.com/crytic/caracal/wiki/How-to-write-a-printer)
 
 ## Limitations
-- When caracal compiles your source itself (the standalone-file and cairo-project flows with the bundled compiler), findings carry Cairo source locations rendered as ` (path/to/file.cairo:LINE)` — the path is relative to the analyzed target. Locations are not available for pre-built artifacts (the Scarb flow and the last-resort `starknet-compile` fallback), where findings keep the location-less format and can only reference SIERRA functions/instructions.
-- When caracal compiles your source itself (the standalone-file and cairo-project flows with the bundled compiler), it compiles with function inlining avoided, so user functions survive as separate, named SIERRA functions and the historical "inlined functions are not handled correctly" limitation no longer applies there. Only `#[inline(always)]` functions are still inlined. The limitation remains for pre-built SIERRA compiled with the compiler's default aggressive inlining — Scarb artifacts without `inlining-strategy = "avoid"`, and the last-resort `starknet-compile` fallback — where detectors that reason across calls can miss inlined code.
+- When caracal compiles your source itself (the standalone-file, cairo-project and in-process Scarb flows with the bundled compiler), findings carry Cairo source locations rendered as ` (path/to/file.cairo:LINE)` — the path is relative to the analyzed target. For a Scarb project, code from an external dependency (which lives under Scarb's cache at a machine-specific absolute path) is rendered as `<dep-name>/<path within the dependency's package>` instead; corelib locations are always dropped. Locations are not available for pre-built artifacts (the Scarb fallback path and the last-resort `starknet-compile` fallback), where findings keep the location-less format and can only reference SIERRA functions/instructions.
+- When caracal compiles your source itself (the standalone-file, cairo-project and in-process Scarb flows with the bundled compiler), it compiles with function inlining avoided, so user functions survive as separate, named SIERRA functions and the historical "inlined functions are not handled correctly" limitation no longer applies there. Only `#[inline(always)]` functions are still inlined. The limitation remains for pre-built SIERRA compiled with the compiler's default aggressive inlining — Scarb artifacts without `inlining-strategy = "avoid"` (the Scarb fallback path), and the last-resort `starknet-compile` fallback — where detectors that reason across calls can miss inlined code.
 - Because analysis compiles with inlining avoided, the analyzed SIERRA differs from the SIERRA you deploy with default inlining: findings describe your source's semantics, not the deployed program's statement layout.

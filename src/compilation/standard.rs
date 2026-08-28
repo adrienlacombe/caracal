@@ -21,7 +21,7 @@ use super::ProgramCompiled;
 use crate::compilation::utils::felt252_serde::sierra_from_felt252s;
 use crate::compilation::utils::replacer::SierraProgramDebugReplacer;
 use crate::core::core_unit::CoreOpts;
-use crate::core::source_map::SourceMap;
+use crate::core::source_map::{SourceBase, SourceMap};
 
 pub fn compile(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
     // The bundled in-process compiler (which avoids function inlining, giving
@@ -125,13 +125,22 @@ fn bundled_compiler(opts: CoreOpts, corelib: PathBuf) -> Result<Vec<ProgramCompi
 
     // Source locations in findings are reported relative to the directory the
     // analyzed file lives in; locations outside it (corelib) are dropped.
-    let source_base = opts.target.parent().and_then(|p| p.canonicalize().ok());
+    let source_bases: Vec<SourceBase> = opts
+        .target
+        .parent()
+        .and_then(|p| p.canonicalize().ok())
+        .map(|root| {
+            vec![SourceBase {
+                root,
+                prefix: String::new(),
+            }]
+        })
+        .unwrap_or_default();
 
     for contract_class in contract_classes {
         let debug_info = contract_class.sierra_program_debug_info.unwrap();
-        let source_map = source_base
-            .as_deref()
-            .map(|base| SourceMap::new(&debug_info, base));
+        let source_map =
+            (!source_bases.is_empty()).then(|| SourceMap::new(&debug_info, &source_bases));
         let program = sierra_from_felt252s(&contract_class.sierra_program)
             .unwrap()
             .2;

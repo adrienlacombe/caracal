@@ -70,3 +70,15 @@ jobs:
       # tests/corpus/expected_summary.txt.
       - name: Run corpus regression check
         run: ./scripts/corpus.sh
+      # The in-process Scarb compilation test needs scarb on PATH, which the
+      # cross-platform test job doesn't have; reuse the scarb corpus.sh just
+      # provisioned into its cache. --release reuses the corpus run's build.
+      - name: Scarb in-process compilation test
+        run: |
+          if ! command -v scarb >/dev/null 2>&1; then
+            SCARB_BIN="$(find "$HOME/.cache/caracal-corpus" -type f -name scarb -path '*/bin/*' | head -n 1)"
+            [ -n "$SCARB_BIN" ] || { echo "no scarb found in the corpus cache" >&2; exit 1; }
+            export PATH="$(dirname "$SCARB_BIN"):$PATH"
+          fi
+          scarb --version
+          CARACAL_TEST_SCARB=1 cargo test --release --test scarb_inprocess

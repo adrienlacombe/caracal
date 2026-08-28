@@ -19,8 +19,11 @@ const FUNCTIONS_NAMESPACE: &str = "github.com/software-mansion-labs/cairo-debugg
 pub struct SourceLocation {
     /// Path of the `.cairo` file, relative to the analyzed target (the
     /// target's directory for a single-file target, the project root for a
-    /// cairo project target) and always `/`-separated, so messages stay
-    /// portable across machines and OSes.
+    /// cairo project or Scarb target) and always `/`-separated, so messages
+    /// stay portable across machines and OSes. For code from an external
+    /// dependency of a Scarb project (which lives under Scarb's cache, at a
+    /// machine-specific absolute path) the path is rendered as
+    /// `<dep-name>/<path relative to the dependency's package root>`.
     pub file: String,
     /// 1-based line number.
     pub line: usize,
@@ -56,17 +59,31 @@ pub struct SourceMap {
     functions: HashMap<u64, SourceLocation>,
 }
 
+/// One directory findings may point into, and the prefix its paths are
+/// rendered under. The analyzed target itself is the base with an empty
+/// prefix; a Scarb dependency (whose sources live under Scarb's cache) gets
+/// its package root as the base and `<dep-name>/` as the prefix, so its
+/// machine-specific absolute path never leaks into findings.
+#[derive(Debug, Clone)]
+pub struct SourceBase {
+    /// Canonicalized directory locations are relativized against.
+    pub root: std::path::PathBuf,
+    /// Prepended to the relativized path: empty for the analyzed target,
+    /// `<dep-name>/` for a dependency.
+    pub prefix: String,
+}
+
 impl SourceMap {
     /// Build the mapping from a contract class' debug-info annotations.
-    /// `base` must be the canonicalized directory the analyzed target lives
-    /// in; locations in files outside it (corelib code — including the
-    /// embedded corelib extracted under the OS temp dir — or any other
-    /// machine-specific path) are dropped so they can never leak into
-    /// findings.
-    pub fn new(debug_info: &DebugInfo, base: &Path) -> Self {
+    /// `bases` are tried in order; the first whose root contains the file
+    /// wins (put the analyzed target first). Locations in files outside
+    /// every base (corelib code — including the embedded corelib extracted
+    /// under the OS temp dir — or any other machine-specific path) are
+    /// dropped so they can never leak into findings.
+    pub fn new(debug_info: &DebugInfo, bases: &[SourceBase]) -> Self {
         SourceMap {
-            statements: parse_statement_locations(debug_info, base),
-            functions: parse_function_locations(debug_info, base),
+            statements: parse_statement_locations(debug_info, bases),
+            functions: parse_function_locations(debug_info, bases),
         }
     }
 
@@ -91,7 +108,7 @@ impl SourceMap {
 /// for diagnostics and the one we report.
 fn parse_statement_locations(
     debug_info: &DebugInfo,
-    base: &Path,
+    bases: &[SourceBase],
 ) -> HashMap<usize, SourceLocation> {
     let mut result = HashMap::new();
     let Some(map) = debug_info
@@ -112,7 +129,7 @@ fn parse_statement_locations(
         let (Some(file), Some(span)) = (entry.get(0).and_then(Value::as_str), entry.get(1)) else {
             continue;
         };
-        if let Some(location) = to_source_location(file, span, base) {
+        if let Some(location) = to_source_location(file, span, bases) {
             result.insert(idx, location);
         }
     }
@@ -123,7 +140,10 @@ fn parse_statement_locations(
 /// `{ "<function id>": { function_file_path, function_code_span: {start: {line, col}, …}, … } }`
 /// with 0-based lines/cols. The span covers the whole function; its start is
 /// the declaration site.
-fn parse_function_locations(debug_info: &DebugInfo, base: &Path) -> HashMap<u64, SourceLocation> {
+fn parse_function_locations(
+    debug_info: &DebugInfo,
+    bases: &[SourceBase],
+) -> HashMap<u64, SourceLocation> {
     let mut result = HashMap::new();
     let Some(map) = debug_info
         .annotations
@@ -143,7 +163,7 @@ fn parse_function_locations(debug_info: &DebugInfo, base: &Path) -> HashMap<u64,
         ) else {
             continue;
         };
-        if let Some(location) = to_source_location(file, span, base) {
+        if let Some(location) = to_source_location(file, span, bases) {
             result.insert(id, location);
         }
     }
@@ -151,22 +171,28 @@ fn parse_function_locations(debug_info: &DebugInfo, base: &Path) -> HashMap<u64,
 }
 
 /// Convert one annotation location (file path + 0-based span) into a
-/// [`SourceLocation`], relativizing the file against `base`. Returns `None`
-/// for files outside `base` — most notably corelib sources, which would
+/// [`SourceLocation`], relativizing the file against the first base whose
+/// root contains it and prepending that base's prefix. Returns `None` for
+/// files outside every base — most notably corelib sources, which would
 /// otherwise leak the corelib directory (a temp-dir extraction when the
 /// embedded corelib is used) into findings.
-fn to_source_location(file: &str, span: &Value, base: &Path) -> Option<SourceLocation> {
+fn to_source_location(file: &str, span: &Value, bases: &[SourceBase]) -> Option<SourceLocation> {
     let start = span.get("start")?;
     let line = start.get("line")?.as_u64()? as usize;
     let col = start.get("col")?.as_u64()? as usize;
 
     let path = Path::new(file);
     // The annotation carries the path as the compiler saw it; canonicalize so
-    // it compares against the canonicalized base (symlinks, `..`, relative
-    // targets). Fall back to the lexical path if the file vanished.
+    // it compares against the canonicalized base roots (symlinks, `..`,
+    // relative targets). Fall back to the lexical path if the file vanished.
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let relative = canonical.strip_prefix(base).ok()?;
-    let file = relative
+    let (relative, prefix) = bases.iter().find_map(|base| {
+        canonical
+            .strip_prefix(&base.root)
+            .ok()
+            .map(|rel| (rel, base.prefix.as_str()))
+    })?;
+    let relative = relative
         .components()
         .filter_map(|c| match c {
             Component::Normal(part) => part.to_str(),
@@ -174,11 +200,11 @@ fn to_source_location(file: &str, span: &Value, base: &Path) -> Option<SourceLoc
         })
         .collect::<Vec<_>>()
         .join("/");
-    if file.is_empty() {
+    if relative.is_empty() {
         return None;
     }
     Some(SourceLocation {
-        file,
+        file: format!("{prefix}{relative}"),
         // The annotations are 0-based, editors and humans are 1-based.
         line: line + 1,
         col: col + 1,
