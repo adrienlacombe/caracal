@@ -8,7 +8,6 @@
 # Automates the mechanical part of a compiler upgrade:
 #   1. validates <tag> exists upstream (starkware-libs/cairo)
 #   2. retags every cairo-lang-* git dependency in Cargo.toml in one pass
-#      (the starknet-types-core pin is never touched — see its comment)
 #   3. replaces corelib/ wholesale with the upstream corelib at <tag>
 #      and sanity-checks corelib/cairo_project.toml's version
 #   4. cargo build (refreshes Cargo.lock) + cargo test, then reports
@@ -75,14 +74,10 @@ else
     NEW_TAG="$TAG" perl -pi -e 's/tag = "[^"]+"/tag = "$ENV{NEW_TAG}"/ if /^cairo-lang-/' "$CARGO_TOML"
 fi
 
-# Verify the rewrite: every cairo-lang-* dep now pins $TAG, and the
-# starknet-types-core pin (ARM build workaround, see its comment) survived.
+# Verify the rewrite: every cairo-lang-* dep now pins $TAG.
 RETAGGED="$(grep -E '^cairo-lang-' "$CARGO_TOML" | grep -cF "tag = \"$TAG\"" || true)"
 [[ "$RETAGGED" == "$DEP_COUNT" ]] \
     || die "retag went wrong: only $RETAGGED of $DEP_COUNT cairo-lang-* deps pin $TAG now"
-grep -q '^starknet-types-core = { version = "=0\.1\.7"' "$CARGO_TOML" \
-    || die "the starknet-types-core = \"=0.1.7\" pin is gone from Cargo.toml — it must never be touched by this script"
-
 # -------------------------------------------------- 3. replace corelib/ wholesale
 TARBALL="$WORK_DIR/cairo-$TAG.tar.gz"
 fetched=0

@@ -3,6 +3,16 @@
 All notable changes to this project are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Removed
+- The direct `starknet-types-core = "=0.1.7"` dependency. It was an ARM-build
+  workaround from the cairo-2.5 era and had become dead weight: caracal no
+  longer uses the crate directly, and the pinned cairo v2.20.0 workspace
+  itself depends on `starknet-types-core = "0.2.4"` (which builds fine on
+  ARM — the v0.3.0 aarch64 release binaries prove it), so the pin only
+  forced a duplicate 0.1.7 copy into the build.
+
 ## [0.3.0] - 2026-08-28
 
 First release of this fork ([adrienlacombe/caracal](https://github.com/adrienlacombe/caracal)),
