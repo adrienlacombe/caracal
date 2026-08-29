@@ -1,0 +1,20 @@
+---
+source: tests/integration_tests.rs
+expression: results
+input_file: tests/detectors/deploy_from_zero.cairo
+---
+[
+    Result {
+        impact: Medium,
+        name: "deploy-from-zero",
+        confidence: Medium,
+        message: "deploy_syscall with deploy_from_zero enabled in deploy_from_zero::deploy_from_zero::DeployFromZero::bad_deploy_from_zero\n deploy_syscall (deploy_from_zero.cairo:18)",
+        locations: [
+            SourceLocation {
+                file: "deploy_from_zero.cairo",
+                line: 18,
+                col: 9,
+            },
+        ],
+    },
+]

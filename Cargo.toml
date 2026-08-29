@@ -1,7 +1,7 @@
 [package]
 name = "caracal"
 description = "Starknet smart contract static analysis tool"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,30 +9,42 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.1", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 num-bigint = "0.4"
 num-traits = "0.2"
-once_cell =  "1.17"
-smol_str = "0.2"
-num-integer = "0.1"
 termcolor = "1.2"
-graphviz-rust = "0.7.0"
-cairo-felt = "0.9.1"
-thiserror = "1.0.47"
+graphviz-rust = "0.9"
 rayon = "1.8"
-fxhash = "0.2.1"
+# Already in the dependency tree via the cairo-lang-* crates.
+rustc-hash = "2"
+# Both already in the dependency tree via the cairo-lang-* crates; declaring
+# them adds no new transitive code.
+toml = "1"
+# sha2 0.11 is out but the cairo-lang-* tree is still on 0.10: bumping would
+# add a duplicate sha2 build for no benefit. Revisit with a compiler bump.
+sha2 = "0.10"
+# Also already in the tree (CrateSettings::version is a semver::Version).
+semver = "1"
+# Embeds corelib/src into the binary so the bundled compiler works with no
+# --corelib / CORELIB_PATH setup (see src/compilation/corelib.rs).
+include_dir = "0.7"
 
-cairo-lang-compiler = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-defs = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-plugins = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-starknet = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-filesystem = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-parser = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-syntax = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-semantic = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-utils = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-sierra-generator = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
-cairo-lang-sierra = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.5.0" }
+
+cairo-lang-compiler = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-defs = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-plugins = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-project = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-starknet = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-starknet-classes = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-filesystem = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-lowering = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-parser = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-syntax = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-semantic = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-utils = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-sierra-generator = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
+cairo-lang-sierra = { git = "https://github.com/starkware-libs/cairo.git", tag = "v2.20.0" }
 
 
 [dev-dependencies]

@@ -1,0 +1,16 @@
+---
+source: tests/printer_smoke.rs
+expression: content
+---
+digraph "reentrancy_reentrancy_TestContract_internal_ext_call.dot" {
+  0[label="BB 0
+1603 const_as_immediate<Const<felt252, 4>>() -> ([3])
+1604 struct_construct<reentrancy::reentrancy::IAnotherContractDispatcher>([2]) -> ([4])
+1605 store_temp<GasBuiltin>([0]) -> ([0])
+1606 store_temp<System>([1]) -> ([1])
+1607 store_temp<reentrancy::reentrancy::IAnotherContractDispatcher>([4]) -> ([4])
+1608 store_temp<felt252>([3]) -> ([3])
+1609 function_call<user@reentrancy::reentrancy::IAnotherContractDispatcherImpl::foo>([0], [1], [4], [3]) -> ([5], [6], [7])
+1610 return([5], [6], [7])
+"]
+}

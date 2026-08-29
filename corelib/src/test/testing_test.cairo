@@ -1,10 +1,10 @@
-use core::test::test_utils::assert_gt;
+use crate::test::test_utils::assert_gt;
 
 #[test]
 #[should_panic(expected: ('panic_with_felt252()',))]
 fn test_panic_with_felt252() {
-    // No semicolon here: Missing implementation for core::traits::Drop::<core::never>
-    core::panic_with_felt252('panic_with_felt252()')
+    // No semicolon here: Missing implementation for crate::traits::Drop::<crate::never>
+    crate::panic_with_felt252('panic_with_felt252()')
 }
 
 #[test]
@@ -40,6 +40,50 @@ fn test_assert_ne_no_description() {
 }
 
 #[test]
+fn test_assert_lt_with_description() {
+    assert_lt!(1_u8, 2_u8, "Description");
+}
+
+#[test]
+fn test_assert_lt_no_description() {
+    assert_lt!(1_u8, 2_u8);
+}
+
+#[test]
+fn test_assert_le_with_description() {
+    assert_le!(1_u8, 2_u8, "Description");
+    assert_le!(1_u8, 1_u8, "Description");
+}
+
+#[test]
+fn test_assert_le_no_description() {
+    assert_le!(1_u8, 2_u8);
+    assert_le!(1_u8, 1_u8);
+}
+
+#[test]
+fn test_assert_gt_with_description() {
+    assert_gt!(2_u8, 1_u8, "Description");
+}
+
+#[test]
+fn test_assert_gt_no_description() {
+    assert_gt!(2_u8, 1_u8);
+}
+
+#[test]
+fn test_assert_ge_with_description() {
+    assert_ge!(2_u8, 1_u8, "Description");
+    assert_ge!(2_u8, 2_u8, "Description");
+}
+
+#[test]
+fn test_assert_ge_no_description() {
+    assert_ge!(2_u8, 1_u8);
+    assert_ge!(2_u8, 2_u8);
+}
+
+#[test]
 #[should_panic(expected: "assertion failed: `false`.")]
 fn test_assert_macro_no_input() {
     assert!(false);
@@ -72,11 +116,60 @@ fn test_assert_eq_no_description() {
 #[test]
 #[available_gas(static)]
 fn test_get_available_gas_no_gas_supply() {
-    assert_eq!(core::testing::get_available_gas(), 0)
+    assert_eq!(crate::testing::get_available_gas(), 0)
 }
 
 #[test]
 #[available_gas(10000)]
 fn test_get_available_gas_with_gas_supply() {
-    assert_gt(core::testing::get_available_gas(), 5000, 'high amount of gas used')
+    assert_gt(crate::testing::get_available_gas(), 5000, 'high amount of gas used')
+}
+
+#[test]
+fn test_assert_eq_path_requiring_inference() {
+    assert_eq!(Option::<u32>::None, None);
+}
+
+#[inline(never)]
+fn identity<T>(t: T) -> T {
+    t
+}
+
+#[test]
+fn test_get_unspent_gas() {
+    let one = identity(1);
+    let two = identity(2);
+    let prev = crate::testing::get_unspent_gas();
+    let _three = identity(one + two);
+    let after = crate::testing::get_unspent_gas();
+    let expected_cost = 100 // `one + two`.
+    + 300; // `identity(...)`.
+    assert_eq!(prev - after, expected_cost);
+}
+
+#[derive(Drop, Debug, PartialEq)]
+struct NoCopy {
+    value: u8,
+}
+
+#[test]
+fn test_assert_macros_and_non_copy() {
+    let a = NoCopy { value: 0 };
+    let b = NoCopy { value: 1 };
+    assert_eq!(a, a);
+    assert_ne!(a, b);
+    assert_eq!(b, b);
+    assert_ne!(b, a);
+    assert_eq!(a.value, a.value);
+    assert_ne!(a.value, b.value);
+    assert_eq!(b.value, b.value);
+    assert_ne!(b.value, a.value);
+    assert_eq!(a, a);
+    assert_ne!(a, b);
+    assert_eq!(b, b);
+    assert_ne!(b, a);
+    assert_eq!(a.value, a.value);
+    assert_ne!(a.value, b.value);
+    assert_eq!(b.value, b.value);
+    assert_ne!(b.value, a.value);
 }

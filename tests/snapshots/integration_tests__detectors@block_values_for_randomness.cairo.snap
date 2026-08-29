@@ -1,0 +1,59 @@
+---
+source: tests/integration_tests.rs
+expression: results
+input_file: tests/detectors/block_values_for_randomness.cairo
+---
+[
+    Result {
+        impact: Medium,
+        name: "block-values-for-randomness",
+        confidence: Low,
+        message: "Sequencer controlled block value (timestamp or number) flows into a hash function in block_values_for_randomness::block_values_for_randomness::BlockValuesForRandomness::bad_timestamp_pedersen\n pedersen (block_values_for_randomness.cairo:17)",
+        locations: [
+            SourceLocation {
+                file: "block_values_for_randomness.cairo",
+                line: 17,
+                col: 9,
+            },
+        ],
+    },
+    Result {
+        impact: Medium,
+        name: "block-values-for-randomness",
+        confidence: Low,
+        message: "Sequencer controlled block value (timestamp or number) flows into a hash function in block_values_for_randomness::block_values_for_randomness::BlockValuesForRandomness::bad_timestamp_poseidon\n core::poseidon::poseidon_hash_span (block_values_for_randomness.cairo:33)",
+        locations: [
+            SourceLocation {
+                file: "block_values_for_randomness.cairo",
+                line: 33,
+                col: 9,
+            },
+        ],
+    },
+    Result {
+        impact: Medium,
+        name: "block-values-for-randomness",
+        confidence: Low,
+        message: "Sequencer controlled block value (timestamp or number) flows into a modulo operation in block_values_for_randomness::block_values_for_randomness::BlockValuesForRandomness::bad_block_info_modulo\n core::integer::by_div_rem::RemImpl::rem (block_values_for_randomness.cairo:41)",
+        locations: [
+            SourceLocation {
+                file: "block_values_for_randomness.cairo",
+                line: 41,
+                col: 9,
+            },
+        ],
+    },
+    Result {
+        impact: Medium,
+        name: "block-values-for-randomness",
+        confidence: Low,
+        message: "Sequencer controlled block value (timestamp or number) flows into a modulo operation in block_values_for_randomness::block_values_for_randomness::BlockValuesForRandomness::bad_number_modulo\n core::integer::by_div_rem::RemImpl::rem (block_values_for_randomness.cairo:25)",
+        locations: [
+            SourceLocation {
+                file: "block_values_for_randomness.cairo",
+                line: 25,
+                col: 9,
+            },
+        ],
+    },
+]

@@ -3,12 +3,13 @@ use crate::analysis::taint::WrapperVariable;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Function;
+use crate::utils::{function_locations, function_summary};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::felt252::Felt252Concrete;
 use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
 #[derive(Default)]
@@ -62,6 +63,7 @@ impl Detector for TxOrigin {
                                             if [
                                                 "core::starknet::info::TxInfo",
                                                 "core::starknet::info::v2::TxInfo",
+                                                "core::starknet::info::v3::TxInfo",
                                             ]
                                             .contains(&maybe_tx_info.as_str()) =>
                                         {
@@ -91,13 +93,14 @@ impl Detector for TxOrigin {
                 if tx_origin_used {
                     let message = format!(
                         "The transaction origin contract address is used in an access control check in the function {}",
-                        &function.name()
+                        function_summary(compilation_unit, &function.name())
                     );
                     results.insert(Result {
                         name: self.name().to_string(),
                         impact: self.impact(),
                         confidence: self.confidence(),
                         message,
+                        locations: function_locations(compilation_unit, &function.name()),
                     });
                 }
             }
@@ -136,6 +139,33 @@ impl TxOrigin {
                             invoc.args.clone(),
                             &function.name(),
                         ),
+                    // With inlining avoided (cairo >= 2.6) an address
+                    // comparison is a call into a corelib PartialEq impl
+                    // (e.g. ContractAddressPartialEq::eq) instead of the raw
+                    // felt252_is_zero the impl performs internally.
+                    CoreConcreteLibfunc::FunctionCall(f_called) => {
+                        let callee = f_called
+                            .function
+                            .id
+                            .debug_name
+                            .as_ref()
+                            .map(|n| n.as_str())
+                            .unwrap_or_default();
+                        if callee.starts_with("core::")
+                            && (callee.ends_with("PartialEq::eq")
+                                || callee.ends_with("PartialEq::ne"))
+                        {
+                            let taint = compilation_unit.get_taint(&function.name()).unwrap();
+                            invoc.args.iter().any(|arg| {
+                                taint.taints_any_sources(
+                                    tx_origin_tainted_args,
+                                    &WrapperVariable::new(function.name(), arg.id),
+                                )
+                            })
+                        } else {
+                            false
+                        }
+                    }
                     _ => false,
                 }
             });
@@ -182,7 +212,7 @@ impl TxOrigin {
                                             id.try_into().unwrap(),
                                         )
                                     } else {
-                                        println!(
+                                        eprintln!(
                                             "tx_origin: Did not find sink id, id could be wrong."
                                         );
                                         // This is very likely to use a wrong var id

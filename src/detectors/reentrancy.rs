@@ -4,6 +4,10 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::analysis::dataflow::AnalysisState;
 use crate::analysis::reentrancy::ReentrancyDomain;
 use crate::core::core_unit::CoreUnit;
+use crate::utils::{
+    is_safe_external_call, statement_locations, statement_summary_in_named_function,
+    storage_identity_pretty, storage_variable_identity,
+};
 
 #[derive(Default)]
 pub struct Reentrancy;
@@ -38,70 +42,111 @@ impl Detector for Reentrancy {
                     } = bb_info.1
                     {
                         for call in reentrancy_info.external_calls.iter() {
-                            let external_function_call = format!(
-                                "{}",
-                                call.get_external_call().as_ref().unwrap().get_statement()
+                            let external_function_call = statement_summary_in_named_function(
+                                compilation_unit,
+                                call.get_function(),
+                                call.get_function_call().unwrap().get_statement(),
+                            );
+                            let call_locations = statement_locations(
+                                compilation_unit,
+                                call.get_function(),
+                                call.get_function_call().unwrap().get_statement(),
                             );
 
-                            if let Some(safe_external_calls) = core.get_safe_external_calls() {
-                                if safe_external_calls
-                                    .iter()
-                                    .any(|f_name| external_function_call.contains(f_name))
-                                {
-                                    continue;
-                                }
+                            if is_safe_external_call(call, f.get_statements(), core) {
+                                continue;
                             }
 
-                            if let Some(current_vars_read_before_call) = reentrancy_info
-                                .variables_read_before_calls
-                                .iter()
-                                .find(|entry| entry.0.get_id() == call.get_id())
+                            // Keyed by the call's (function, id) identity; an
+                            // id-only search here used to pick an arbitrary
+                            // same-id block from another function.
+                            if let Some(current_vars_read_before_call) =
+                                reentrancy_info.variables_read_before_calls.get(call)
                             {
                                 let vars_read: Vec<String> = current_vars_read_before_call
-                                    .1
                                     .iter()
                                     .map(|var| {
-                                        var.get_storage_variable_read()
-                                            .as_ref()
-                                            .unwrap()
-                                            .get_statement()
-                                            .to_string()
-                                            .rsplit_once("::")
-                                            .unwrap()
-                                            .0
-                                            .to_string()
+                                        storage_variable_identity(
+                                            compilation_unit,
+                                            var.get_function(),
+                                            var.get_storage_variable_read()
+                                                .as_ref()
+                                                .unwrap()
+                                                .get_statement(),
+                                        )
                                     })
                                     .collect();
                                 for written_variable in
                                     reentrancy_info.storage_variables_written.iter()
                                 {
-                                    let written_variable_name = written_variable
-                                        .get_storage_variable_written()
-                                        .as_ref()
-                                        .unwrap()
-                                        .get_statement()
-                                        .to_string()
-                                        .rsplit_once("::")
-                                        .unwrap()
-                                        .0
-                                        .to_string();
-                                    if vars_read.contains(&written_variable_name) {
+                                    // The write had already happened when this
+                                    // call was made (ordering snapshot taken at
+                                    // call registration) — not "written after
+                                    // the call".
+                                    if reentrancy_info
+                                        .writes_before_calls
+                                        .get(call)
+                                        .is_some_and(|writes| writes.contains(written_variable))
+                                    {
+                                        continue;
+                                    }
+                                    let written_variable_name = storage_variable_identity(
+                                        compilation_unit,
+                                        written_variable.get_function(),
+                                        written_variable
+                                            .get_storage_variable_written()
+                                            .as_ref()
+                                            .unwrap()
+                                            .get_statement(),
+                                    );
+                                    // Precise match when both identities are
+                                    // known; wildcard when either side is
+                                    // unknown (prefer over-reporting to losing
+                                    // the finding).
+                                    let read_before_call = vars_read.iter().any(|read| {
+                                        read.is_empty()
+                                            || written_variable_name.is_empty()
+                                            || *read == written_variable_name
+                                    });
+                                    if read_before_call {
+                                        let write_summary = statement_summary_in_named_function(
+                                            compilation_unit,
+                                            written_variable.get_function(),
+                                            written_variable
+                                                .get_storage_variable_written()
+                                                .as_ref()
+                                                .unwrap()
+                                                .get_statement(),
+                                        );
+                                        // Call first, then the write — the
+                                        // order the message mentions them in.
+                                        let mut locations = call_locations.clone();
+                                        locations.extend(statement_locations(
+                                            compilation_unit,
+                                            written_variable.get_function(),
+                                            written_variable
+                                                .get_storage_variable_written()
+                                                .as_ref()
+                                                .unwrap()
+                                                .get_statement(),
+                                        ));
+                                        let variable =
+                                            storage_identity_pretty(&written_variable_name)
+                                                .unwrap_or_else(|| "Variable".to_string());
                                         results.insert(Result {
                                             name: self.name().to_string(),
                                             impact: self.impact(),
                                             confidence: self.confidence(),
                                             message: format!(
-                                                "Reentrancy in {}\n\tExternal call {} done in {}\n\tVariable written after {} in {}.",
+                                                "Reentrancy in {}\n\tExternal call to {} done in {}\n\t{} written after the call by {} in {}.",
                                                 f.name(),
                                                 external_function_call,
                                                 call.get_function(),
-                                                written_variable
-                                                    .get_storage_variable_written()
-                                                    .as_ref()
-                                                    .unwrap()
-                                                    .get_statement(),
+                                                variable,
+                                                write_summary,
                                                 written_variable.get_function()
                                             ),
+                                            locations,
                                         });
                                     }
                                 }

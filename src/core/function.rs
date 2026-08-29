@@ -7,6 +7,7 @@ use crate::analysis::dataflow::Engine;
 use crate::analysis::reentrancy::ReentrancyAnalysis;
 use crate::utils::BUILTINS;
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreLibfunc, CoreType};
+use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::ids::ConcreteTypeId;
 use cairo_lang_sierra::program::{
     Function as SierraFunction, GenStatement, Param, Statement as SierraStatement,
@@ -109,6 +110,18 @@ impl Function {
 
     pub fn name(&self) -> String {
         self.data.id.to_string()
+    }
+
+    /// Numeric sierra id of the function (stable across the debug-name
+    /// replacement — only `debug_name` is rewritten).
+    pub fn id(&self) -> u64 {
+        self.data.id.id
+    }
+
+    /// Program-level statement index of the function's first statement;
+    /// `entry_point() + i` is the program-level index of `get_statements()[i]`.
+    pub fn entry_point(&self) -> usize {
+        self.data.entry_point.0
     }
 
     pub fn ty(&self) -> &Type {
@@ -218,6 +231,22 @@ impl Function {
                 let lib_func = registry
                     .get_libfunc(&invoc.libfunc_id)
                     .expect("Library function not found in the registry");
+                // Since cairo 2.11+ the storage helpers are inlined away, so
+                // reads/writes appear as raw syscalls instead of FunctionCall
+                // statements to `Type::Storage` functions (mirrors
+                // BasicBlock::analyze).
+                if let CoreConcreteLibfunc::Starknet(sn) = lib_func {
+                    match sn {
+                        StarknetConcreteLibfunc::StorageRead(_) => {
+                            self.storage_vars_read.push(s.clone())
+                        }
+                        StarknetConcreteLibfunc::StorageWrite(_) => {
+                            self.storage_vars_written.push(s.clone())
+                        }
+                        _ => (),
+                    }
+                    continue;
+                }
                 if let CoreConcreteLibfunc::FunctionCall(f_called) = lib_func {
                     // We search for the function called in our list of functions to know its type
                     for function in functions {

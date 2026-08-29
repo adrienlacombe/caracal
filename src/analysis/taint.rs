@@ -1,5 +1,5 @@
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
-use fxhash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Wrapper around a VarId
 /// it's used to univocally identify variables

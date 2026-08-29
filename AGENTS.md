@@ -1,0 +1,73 @@
+# Caracal — agent guide
+
+Caracal is a static analyzer for Starknet smart contracts, written in Rust. It compiles Cairo source to SIERRA and runs detectors/printers over the SIERRA representation — it never analyzes Cairo source directly. This repo is a fork of `crytic/caracal` upgraded to Cairo compiler **v2.20.0** (all `cairo-lang-*` deps are pinned to that git tag in `Cargo.toml`; the vendored `corelib/` matches it). Cairo ≥ 2.19 requires rustc ≥ 1.94.
+
+## Build, test, lint
+
+```bash
+cargo build                 # build the CLI
+cargo test                  # runs unit tests + snapshot integration tests
+cargo clippy --all-targets  # CI fails on ANY warning (RUSTFLAGS="-Dwarnings")
+cargo fmt --all             # rustfmt, checked in CI
+```
+
+- Tests are self-contained: the integration harness points the compiler at the vendored `corelib/src`, no environment setup needed.
+- CI (`.github/workflows/ci.yml`) runs clippy with `-Dwarnings` and `cargo test` on Linux/macOS/Windows. Treat every new warning as a build break.
+- Rust edition 2021. No nightly features.
+
+## Snapshot tests (insta)
+
+`tests/integration_tests.rs` globs every `tests/detectors/*.cairo` fixture, compiles it, runs **all** detectors, sorts the results, and asserts against a snapshot in `tests/snapshots/`.
+
+- After changing detector behavior or adding a fixture, run `cargo test`, then review/accept snapshots with `cargo insta review` (install via `cargo install cargo-insta`), or non-interactively: `INSTA_UPDATE=always cargo test` followed by a manual diff of `tests/snapshots/`.
+- Never hand-edit `.snap` files; never accept a snapshot diff you can't explain.
+- Because every fixture runs every detector, adding a detector can legitimately change other fixtures' snapshots — check those diffs are expected findings, not regressions.
+- The harness sets `safe_external_calls: ["::safe_foo"]` — functions matching that selector are treated as safe external calls in reentrancy fixtures.
+
+## Real-world corpus regression (`scripts/corpus.sh`)
+
+The synthetic fixtures can't catch a compiler bump silently killing a detector on real code, so CI's `corpus` job (ubuntu only) runs caracal over pinned checkouts of two real-world targets and diffs the per-detector finding counts (zeros included) against the committed summaries in `tests/corpus/`. Any drift, a caracal crash, zero contracts analyzed, or a target switching Scarb compilation path fails the job. The targets deliberately cover both Scarb paths:
+
+- `oz` — openzeppelin/cairo-contracts (library + mocks), expected summary `tests/corpus/expected_summary_oz.txt`. Exercises the Scarb ARTIFACT FALLBACK path: OZ v4 depends on Rust proc macros (`openzeppelin_macros`, `snforge_scarb_plugin` in the `openzeppelin_test_common` unit), which the bundled compiler cannot expand.
+- `ekubo-governance` — EkuboProtocol/governance (application-style: governor, staker, airdrop; MIT), expected summary `tests/corpus/expected_summary_ekubo_governance.txt`. Proc-macro-free, so it exercises the IN-PROCESS Scarb path on real code, including source locations in finding messages; the script asserts the in-process marker so a silent regression to the fallback fails. (The gated `tests/scarb_inprocess.rs` still covers the in-process path with a synthetic fixture in the same CI job.)
+
+Run it locally with `scripts/corpus.sh` (self-contained: downloads the pinned scarb and clones the corpora into `~/.cache/caracal-corpus`, override with `CARACAL_CORPUS_CACHE`; `--target NAME` runs one target, `NAME=path` reuses an existing checkout). After an *intentional* change to detector behavior, regenerate with `scripts/corpus.sh --bless`, review the summary diffs finding-by-finding like a snapshot, and commit them. The corpus tags and scarb version are pinned at the top of `scripts/corpus.sh` — bump them together with compiler upgrades, then re-bless. The script patches the OZ checkout's manifests (documented in the script; ekubo-governance needs no patches). Corollary: detector output must be run-to-run deterministic — `BasicBlock`'s `Eq` and `Hash` are both keyed on (function, id) for exactly this reason; don't reintroduce id-only comparisons.
+
+## Layout
+
+| Path | Purpose |
+|---|---|
+| `src/core/` | `CoreUnit`/`CompilationUnit` (analysis entry points), CFG, basic blocks, functions, SIERRA instructions |
+| `src/analysis/` | Reusable analyses: dataflow framework, taint analysis, CFG traversal |
+| `src/detectors/` | One file per detector + `detector.rs` (trait) + `mod.rs` (registry) |
+| `src/printers/` | CFG / callgraph `.dot` exporters |
+| `src/compilation/` | Cairo→SIERRA compilation glue (standalone files, cairo projects, Scarb) |
+| `src/cli/` | clap-based CLI (`detect`, `print`, `detectors`, `printers` subcommands) |
+| `tests/detectors/` | Cairo fixtures, one per detector, named after the detector file |
+| `tests/snapshots/` | insta snapshots (committed) |
+| `corelib/` | Vendored Cairo corelib (version matches the pinned compiler) — do not modify; replace wholesale when bumping the compiler. `corelib/src` is also embedded into the binary at build time (`include_dir` in `src/compilation/corelib.rs`), so the CLI needs no corelib setup |
+
+## Adding a detector
+
+1. Create `src/detectors/<name>.rs` implementing the `Detector` trait (`name`, `description`, `impact`, `confidence`, `run(&self, core: &CoreUnit) -> HashSet<Result>`). Kebab-case the public name (`"controlled-replace-class"`), snake_case the file.
+2. Register it in `src/detectors/mod.rs`: add the `pub mod` line and a `Box::<...>::default()` entry in `get_detectors()`.
+   - Build finding messages with the `statement_summary_in_named_function` / `function_summary` helpers in `src/utils/mod.rs`, never `format!("{stmt}")` — VarIds and branch targets are compiler-assigned and churn on every compiler bump. The helpers also append the Cairo source location (` (file.cairo:LINE)`) when one is available.
+3. Add a fixture `tests/detectors/<name>.cairo` with both vulnerable and safe variants, run `cargo test`, and accept the new snapshot.
+4. Add a row to the detectors table in `README.md`.
+5. Detectors typically walk `core.get_compilation_units()` → functions → SIERRA statements, matching on `CoreConcreteLibfunc` variants, and use the taint analysis in `src/analysis/taint.rs` to decide whether inputs are user-controlled. Read a sibling detector (e.g. `controlled_library_call.rs` / `controlled_replace_class.rs`) before writing a new one.
+
+## Constraints and gotchas
+
+- **Scarb compilation is two-path**: `src/compilation/scarb.rs` first tries to compile the project's SOURCES in-process — it parses `scarb metadata --format-version 1` (hand-rolled serde structs; scarb prints `warn:` lines to stdout before the JSON, the parser skips to the first `{` line) and builds one `RootDatabase` per starknet-contract compilation unit (crate roots/editions/cfg/dependencies from the metadata, corelib from the usual resolution chain, inlining avoided, locations on; contracts come from the unit's own package via `find_contracts`, mirroring scarb's default selection). It falls back to the historical pre-built-artifact path (`scarb clean` + `scarb build --workspace` + `target/dev/*.contract_class.json`) — with a stderr NOTE — when a unit needs Cairo plugins beyond the builtin `starknet` suite (Rust proc macros need scarb's infrastructure; OZ cairo-contracts v4 — the `oz` corpus target — hits this via `openzeppelin_macros`/`snforge_scarb_plugin`, so it exercises the FALLBACK path, while the proc-macro-free `ekubo-governance` corpus target exercises the in-process path), when a target uses `build-external-contracts`, when metadata is missing/unparsable, when no corelib resolves, or on any in-process compile error. Crates are identified by NAME (machine-specific scarb package ids never leak into output). The gated end-to-end test is `tests/scarb_inprocess.rs` (fixture: `tests/scarb_project/`) — it needs scarb on PATH, so it's behind `CARACAL_TEST_SCARB=1` and runs in CI's corpus job.
+- **Source locations**: when caracal compiles the source itself (bundled compiler: the standalone-file, cairo-project and in-process Scarb flows), the contract class is compiled with `add_statements_code_locations` + `add_functions_debug_info`, and `src/core/source_map.rs` turns those annotations into a per-statement / per-function `SourceMap` carried on `ProgramCompiled` → `CompilationUnit`. The message helpers append locations as ` (path/to/file.cairo:LINE)` — paths are RELATIVE to the analyzed target (portability: snapshots run on three OSes) and locations outside the target (corelib, including the embedded-corelib temp extraction) are dropped — except a Scarb project's external dependencies (under Scarb's cache), which render as `<dep-name>/<path within the dependency's package>` via `SourceMap`'s prefixed bases (`SourceBase`). Pre-built artifacts (Scarb fallback path, `starknet-compile` fallback) have no mapping: findings keep the location-less format — never render empty parentheses or "unknown". Detector-facing API: `CompilationUnit::statement_location(owner, stmt)` / `function_location(name)`, plus the `statement_locations` / `function_locations` helpers in `src/utils/mod.rs` that feed `detector::Result::locations` (a `Vec<SourceLocation>`, message order — reentrancy findings carry call then write/event; empty when unmapped). Machine-readable output: `caracal detect --format json|sarif` (renderers in `src/output/mod.rs`, snapshot-tested in `tests/output_formats.rs`) writes only the document to stdout — compilation progress is `eprintln!`, keep it that way — and `--fail-on <impact>` exits 1 on findings at/above the threshold (2 = caracal failed; contract documented in README and `detect --help`).
+- **Config and baseline**: `caracal detect` reads an optional `caracal.toml` (`src/config.rs` — discovery: target dir, then cwd; `--config` overrides; unknown keys are a hard error) and supports a finding baseline (`src/baseline.rs`): `--write-baseline` records fingerprints, `--baseline` suppresses matching findings from output and `--fail-on` counting. Precedence is CLI > config > default per setting, except detector selection where the CLI flags win as a group; the CLI/config merge lives in `src/cli/commands/detect/mod.rs` (`Effective::merge`, unit-tested there). Fingerprints are SHA-256 over detector name + line/ordinal-normalized message + location files — the normalization in `src/baseline.rs` tracks the message-helper formats in `src/utils/mod.rs`, so changing ` (file.cairo:LINE)` or ` (Nth occurrence)` rendering means revisiting `normalize_message` and bumping the baseline version. The same fingerprint is emitted as SARIF `partialFingerprints["caracalFingerprint/v1"]`. End-to-end tests (including through the real binary) are in `tests/config_baseline.rs`. Default behavior with no config file and no baseline flags is unchanged; `scripts/corpus.sh` runs with neither, and the repo root and corpus checkout must stay free of stray `caracal.toml` files.
+- **Inlining**: since commit `329fb95` caracal compiles source with `InliningStrategy::Avoid` (set in `src/compilation/{standard,cairo_project,scarb}.rs`), so user functions survive as separate, named SIERRA functions and detectors see real `FunctionCall` statements. The historical "inlined functions are not handled correctly" caveat now applies only to pre-inlined SIERRA input: Scarb artifacts consumed by the Scarb FALLBACK path when built without `inlining-strategy = "avoid"` in `[cairo]`, and the `starknet-compile` shell-out (no inlining flag) — the latter is only a last-resort fallback: the bundled compiler runs whenever a corelib resolves (`--corelib` → `CORELIB_PATH` → the corelib embedded in the binary, extracted under the OS temp dir; see `src/compilation/corelib.rs`), and the fallback prints a degraded-analysis warning. Keep the raw-syscall matching paths in detectors — they are what still works on that input.
+- Compiler behavior changes across Cairo versions can silently neuter detectors. Precedent: `unused_arguments` went inert on Cairo ≥ 2.6 (documented in commit `61488ce`, revived by the inlining-avoid change in `329fb95` — it stays inert only on pre-inlined artifacts). `dead_code` is still inert: the compiler drops unreachable functions from SIERRA entirely. When a detector stops firing after a compiler bump, check codegen changes before assuming the detector is wrong, and document inert detectors in code comments rather than deleting them.
+- Some detectors are version-gated (README "Cairo" column, 1 vs 2). This fork targets Cairo 2.x.
+- `Cargo.lock` is committed (binary crate) — keep it in sync when touching `Cargo.toml`.
+- Upgrading the Cairo compiler: run `scripts/bump-cairo.sh <tag>` — it retags every `cairo-lang-*` dep, replaces `corelib/` wholesale with the upstream corelib at that tag, rebuilds (refreshing `Cargo.lock`), runs the tests, and reports per-detector snapshot drift without promoting anything. Then follow its printed checklist: review/promote snapshots, and re-pin + re-bless the corpus job (`scripts/corpus.sh`).
+
+## Git conventions
+
+- `master` is the default branch; current work happens on feature branches (e.g. `upgrade-cairo`).
+- Commit messages are short imperative subjects ("Add controlled-replace-class detector"), no prefixes.

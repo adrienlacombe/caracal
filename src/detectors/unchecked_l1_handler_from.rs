@@ -3,10 +3,11 @@ use crate::analysis::taint::WrapperVariable;
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::{Function, Type};
+use crate::utils::{function_locations, function_summary};
 use cairo_lang_sierra::extensions::{core::CoreConcreteLibfunc, felt252::Felt252Concrete};
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
 #[derive(Default)]
@@ -40,10 +41,63 @@ impl Detector for UncheckedL1HandlerFrom {
                 .collect();
 
             for f in l1_handler_funcs {
-                let from_address =
-                    f.params().map(|p| p.id.clone()).collect::<Vec<VarId>>()[1].clone();
                 let mut sources = FxHashSet::default();
-                sources.insert(WrapperVariable::new(f.name(), from_address.id));
+                if f.name().contains("::__wrapper__") {
+                    // Since cairo 2.6 the handler entrypoint is a
+                    // `__wrapper__*` whose only data parameter is the raw
+                    // `Span<felt252>` calldata; `from_address` no longer
+                    // exists as a parameter. The OS prepends it to the
+                    // calldata, and deserialization runs before any user
+                    // code, so the first deserialization of the wrapper pops
+                    // exactly `from_address`. Two shapes exist:
+                    // - inlining avoided (caracal's own compilation): a call
+                    //   to `core::Felt252Serde::deserialize` whose 2nd result
+                    //   is the deserialized `Option<felt252>` — seed with it
+                    //   (the taint flows through the enum_match and into the
+                    //   call to the user's handler function).
+                    // - inlined sierra (e.g. scarb artifacts): a raw
+                    //   `array_snapshot_pop_front<felt252>` — seed with the
+                    //   popped box (the taint map flows it through `unbox`
+                    //   and the stores on its own).
+                    let from_var = f.get_statements().iter().find_map(|stmt| match stmt {
+                        SierraStatement::Invocation(invoc)
+                            if invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
+                                n.starts_with("array_snapshot_pop_front<felt252>")
+                            }) =>
+                        {
+                            invoc
+                                .branches
+                                .first()
+                                .and_then(|b| b.results.get(1))
+                                .map(|v| v.id)
+                        }
+                        SierraStatement::Invocation(invoc)
+                            if invoc.libfunc_id.debug_name.as_ref().is_some_and(|n| {
+                                n == "function_call<user@core::Felt252Serde::deserialize>"
+                            }) =>
+                        {
+                            invoc
+                                .branches
+                                .first()
+                                .and_then(|b| b.results.get(1))
+                                .map(|v| v.id)
+                        }
+                        _ => None,
+                    });
+                    let Some(from_var) = from_var else {
+                        continue;
+                    };
+                    sources.insert(WrapperVariable::new(f.name(), from_var));
+                } else {
+                    // Pre-2.6 shape: the handler is its own function with the
+                    // signature (self: @ContractState, from_address, ...) and
+                    // `from_address` is the 2nd parameter.
+                    let params_vec: Vec<VarId> = f.params().map(|p| p.id.clone()).collect();
+                    if params_vec.len() < 2 {
+                        continue;
+                    }
+                    sources.insert(WrapperVariable::new(f.name(), params_vec[1].id));
+                }
 
                 // Used to avoid infinite recursion in case of recursive private function calls
                 let mut checked_private_functions = HashSet::new();
@@ -59,13 +113,14 @@ impl Detector for UncheckedL1HandlerFrom {
                 if !from_checked {
                     let message = format!(
                         "The L1 handler function {} does not check the L1 from address",
-                        &f.name()
+                        function_summary(compilation_unit, &f.name())
                     );
                     results.insert(Result {
                         name: self.name().to_string(),
                         impact: self.impact(),
                         confidence: self.confidence(),
                         message,
+                        locations: function_locations(compilation_unit, &f.name()),
                     });
                 }
             }
@@ -104,6 +159,32 @@ impl UncheckedL1HandlerFrom {
                             compilation_unit,
                             &function.name(),
                         ),
+                    // With inlining avoided (cairo >= 2.6) an equality check
+                    // is a call into a corelib PartialEq impl instead of the
+                    // raw felt252_is_zero the impl performs internally.
+                    CoreConcreteLibfunc::FunctionCall(f_called) => {
+                        let callee = f_called
+                            .function
+                            .id
+                            .debug_name
+                            .as_ref()
+                            .map(|n| n.as_str())
+                            .unwrap_or_default();
+                        if callee.starts_with("core::")
+                            && (callee.ends_with("PartialEq::eq")
+                                || callee.ends_with("PartialEq::ne"))
+                        {
+                            let taint = compilation_unit.get_taint(&function.name()).unwrap();
+                            invoc.args.iter().any(|arg| {
+                                taint.taints_any_sources(
+                                    from_tainted_args,
+                                    &WrapperVariable::new(function.name(), arg.id),
+                                )
+                            })
+                        } else {
+                            false
+                        }
+                    }
                     _ => false,
                 }
             });
@@ -132,14 +213,26 @@ impl UncheckedL1HandlerFrom {
                             .map(|v| WrapperVariable::new(function.name(), v.id))
                             .collect();
 
+                        // The i-th call argument binds the callee's i-th
+                        // parameter, so map tainted arguments to callee
+                        // parameters by position. (The old id arithmetic
+                        // `sink - args[0]` assumed consecutively numbered
+                        // caller arguments, which post-2.6 codegen breaks.)
+                        let callee_params: Vec<u64> =
+                            private_function.params_all().map(|p| p.id.id).collect();
+
                         let from_tainted_args: FxHashSet<WrapperVariable> = from_tainted_args
                             .iter()
                             .flat_map(|source| taint.taints_any_sinks_variable(source, &sinks))
-                            .map(|sink| {
-                                WrapperVariable::new(
-                                    private_function.name(),
-                                    sink.variable() - invoc.args[0].id,
-                                )
+                            .filter_map(|sink| {
+                                invoc
+                                    .args
+                                    .iter()
+                                    .position(|a| a.id == sink.variable())
+                                    .and_then(|pos| callee_params.get(pos))
+                                    .map(|param| {
+                                        WrapperVariable::new(private_function.name(), *param)
+                                    })
                             })
                             .collect();
 

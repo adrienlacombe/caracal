@@ -5,21 +5,88 @@ input_file: tests/detectors/unused_arguments.cairo
 ---
 [
     Result {
-        impact: Low,
-        name: "unused-arguments",
+        impact: Medium,
+        name: "felt252-unsafe-arithmetic",
         confidence: Medium,
-        message: "The 2nd argument in unused_arguments::unused_arguments::UnusedArguments::unused_2 is never used",
+        message: "The function unused_arguments::unused_arguments::UnusedArguments::comp_helper uses the felt252 operation core::Felt252Add::add (unused_arguments.cairo:108), which is not overflow/underflow safe",
+        locations: [
+            SourceLocation {
+                file: "unused_arguments.cairo",
+                line: 108,
+                col: 9,
+            },
+        ],
+    },
+    Result {
+        impact: Medium,
+        name: "felt252-unsafe-arithmetic",
+        confidence: Medium,
+        message: "The function unused_arguments::unused_arguments::UnusedArguments::helper uses the felt252 operation core::Felt252Add::add (unused_arguments.cairo:77), which is not overflow/underflow safe",
+        locations: [
+            SourceLocation {
+                file: "unused_arguments.cairo",
+                line: 77,
+                col: 9,
+            },
+        ],
+    },
+    Result {
+        impact: Medium,
+        name: "felt252-unsafe-arithmetic",
+        confidence: Medium,
+        message: "The function unused_arguments::unused_arguments::generic_unused::<core::integer::u128, core::integer::u128Drop> uses the felt252 operation core::Felt252Add::add (unused_arguments.cairo:7), which is not overflow/underflow safe",
+        locations: [
+            SourceLocation {
+                file: "unused_arguments.cairo",
+                line: 7,
+                col: 5,
+            },
+        ],
+    },
+    Result {
+        impact: Medium,
+        name: "unused-events",
+        confidence: Medium,
+        message: "Event Event defined in unused_arguments::unused_arguments::testcomp is never emitted",
+        locations: [],
     },
     Result {
         impact: Low,
         name: "unused-arguments",
         confidence: Medium,
-        message: "The 3rd argument in unused_arguments::unused_arguments::UnusedArguments::unused_1 is never used",
+        message: "The 2nd argument in unused_arguments::unused_arguments::UnusedArguments::unused_2 (unused_arguments.cairo:62) is never used",
+        locations: [
+            SourceLocation {
+                file: "unused_arguments.cairo",
+                line: 62,
+                col: 5,
+            },
+        ],
     },
     Result {
         impact: Low,
         name: "unused-arguments",
         confidence: Medium,
-        message: "The 3rd argument in unused_arguments::unused_arguments::UnusedArguments::unused_2 is never used",
+        message: "The 3rd argument in unused_arguments::unused_arguments::UnusedArguments::unused_1 (unused_arguments.cairo:57) is never used",
+        locations: [
+            SourceLocation {
+                file: "unused_arguments.cairo",
+                line: 57,
+                col: 5,
+            },
+        ],
+    },
+    Result {
+        impact: Low,
+        name: "unused-arguments",
+        confidence: Medium,
+        message: "The 3rd argument in unused_arguments::unused_arguments::UnusedArguments::unused_2 (unused_arguments.cairo:62) is never used",
+        locations: [
+            SourceLocation {
+                file: "unused_arguments.cairo",
+                line: 62,
+                col: 5,
+            },
+        ],
     },
 ]

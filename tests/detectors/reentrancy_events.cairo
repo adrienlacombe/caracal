@@ -40,4 +40,14 @@ mod TestContract {
         self.emit(MyEvent { });
     }
 
+    // The event is emitted after the first call (one finding) but BEFORE the
+    // second call: pairing the second call with the earlier event would be a
+    // false positive.
+    #[external(v0)]
+    fn bad2_emit_between_calls(ref self: ContractState, address: ContractAddress) {
+        IAnotherContractDispatcher { contract_address: address }.foo(4);
+        self.emit(MyEvent { });
+        IAnotherContractDispatcher { contract_address: address }.foo(5);
+    }
+
 }

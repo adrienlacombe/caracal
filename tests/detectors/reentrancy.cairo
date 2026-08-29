@@ -82,4 +82,25 @@ mod TestContract {
         IAnotherContractDispatcher { contract_address: address }.foo(4);
     }
 
+    // Reads `a` before the call but writes only `b` after it: with precise
+    // storage-variable pairing this is reentrancy-benign, not reentrancy.
+    #[external(v0)]
+    fn benign1(ref self: ContractState, address: ContractAddress) {
+        let a = self.a.read();
+        IAnotherContractDispatcher { contract_address: address }.foo(a);
+        self.b.write(4);
+    }
+
+    // `a` is read before both calls and written between them: the write is
+    // after the first call (one finding) but BEFORE the second call —
+    // pairing the second call with the earlier write would be a false
+    // positive.
+    #[external(v0)]
+    fn bad6_write_between_calls(ref self: ContractState, address: ContractAddress) {
+        let a = self.a.read();
+        IAnotherContractDispatcher { contract_address: address }.foo(a);
+        self.a.write(4);
+        IAnotherContractDispatcher { contract_address: address }.foo(a);
+    }
+
 }

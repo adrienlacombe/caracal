@@ -1,4 +1,5 @@
 use super::function::{Function, Type};
+use super::source_map::{SourceLocation, SourceMap};
 use crate::analysis::taint::Taint;
 use crate::analysis::taint::WrapperVariable;
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreLibfunc, CoreType};
@@ -7,12 +8,27 @@ use cairo_lang_sierra::program::{
     Function as SierraFunction, GenStatement, Program, Statement as SierraStatement,
 };
 use cairo_lang_sierra::program_registry::ProgramRegistry;
-use cairo_lang_starknet::abi::{
-    Contract, Item::Function as AbiFunction, Item::Interface as AbiInterface,
-    Item::L1Handler as AbiL1Handler,
+use cairo_lang_starknet_classes::abi::{
+    Contract, EventFieldKind, EventKind, Item::Event as AbiEvent, Item::Function as AbiFunction,
+    Item::Interface as AbiInterface, Item::L1Handler as AbiL1Handler,
 };
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 use std::collections::{HashMap, HashSet};
+
+/// One variant of an ABI event enum, i.e. one emittable event.
+pub struct DeclaredEvent {
+    /// Full path of the event enum the variant belongs to
+    pub enum_path: String,
+    /// Index of the variant within the enum — matches the index in the
+    /// sierra `enum_init<enum_path, index>` that constructs it
+    pub variant_index: usize,
+    /// Total number of variants in the enum (flat ones included)
+    pub enum_size: usize,
+    /// Variant name; `starknet_keccak` of it is the emitted selector key
+    pub variant_name: String,
+    /// Full path of the variant's event struct type, used for reporting
+    pub ty: String,
+}
 
 pub struct CompilationUnit {
     /// The compiled sierra program
@@ -25,6 +41,9 @@ pub struct CompilationUnit {
     registry: ProgramRegistry<CoreType, CoreLibfunc>,
     /// Function name to taints
     taint: HashMap<String, Taint>,
+    /// Sierra → Cairo source mapping; `None` when the analyzed sierra comes
+    /// from a pre-built artifact where no source mapping survives
+    source_map: Option<SourceMap>,
 }
 
 impl CompilationUnit {
@@ -32,6 +51,7 @@ impl CompilationUnit {
         sierra_program: Program,
         abi: Contract,
         registry: ProgramRegistry<CoreType, CoreLibfunc>,
+        source_map: Option<SourceMap>,
     ) -> Self {
         CompilationUnit {
             sierra_program,
@@ -39,7 +59,35 @@ impl CompilationUnit {
             abi,
             registry,
             taint: HashMap::new(),
+            source_map,
         }
+    }
+
+    /// Cairo source location the statement was generated from, resolved
+    /// against the function that owns the statement (named `owner` — it may
+    /// differ from the function under analysis, e.g. through the reentrancy
+    /// analysis' private-call recursion). `None` when no source mapping is
+    /// available, the owner can't be resolved, or the statement maps outside
+    /// the analyzed target (corelib code).
+    pub fn statement_location(
+        &self,
+        owner: &str,
+        stmt: &SierraStatement,
+    ) -> Option<&SourceLocation> {
+        let source_map = self.source_map.as_ref()?;
+        let function = self.function_by_name(owner)?;
+        // Find the statement's offset within its owner to recover its
+        // program-level index. Byte-identical statements resolve to the first
+        // occurrence — the same approximation the summary-ordinal logic makes.
+        let position = function.get_statements().iter().position(|s| s == stmt)?;
+        source_map.statement(function.entry_point() + position)
+    }
+
+    /// Cairo declaration site of the sierra function named `name`. Same
+    /// `None` conditions as [`Self::statement_location`].
+    pub fn function_location(&self, name: &str) -> Option<&SourceLocation> {
+        let source_map = self.source_map.as_ref()?;
+        source_map.function(self.function_by_name(name)?.id())
     }
 
     /// Returns all the functions in the Sierra program
@@ -67,16 +115,38 @@ impl CompilationUnit {
         self.functions.iter().find(|f| f.name().as_str() == name)
     }
 
-    /// Returns all events name
-    pub fn all_events_name(&self) -> impl Iterator<Item = String> + '_ {
-        self.functions
-            .iter()
-            .filter(|f| {
-                f.name().ends_with("::append_keys_and_data")
-                    && !f.name().contains("::EventIsEvent::") // EventIsEvent represents the enum Event that contains the events so we discard it
+    /// Declared events, read from the ABI's event-enum items. (The old
+    /// implementation scanned for the derived `*IsEvent::append_keys_and_data`
+    /// sierra functions, which the compiler inlines away since cairo 2.6.)
+    /// Flat variants are skipped — their selector comes from the inner enum's
+    /// own variants, not from this variant's name.
+    pub fn declared_events(&self) -> Vec<DeclaredEvent> {
+        self.abi
+            .clone()
+            .into_iter()
+            .filter_map(|item| match item {
+                AbiEvent(e) => match e.kind {
+                    EventKind::Enum { variants } => Some((e.name, variants)),
+                    _ => None,
+                },
+                _ => None,
             })
-            // We discard IsEvent to have only the events' name e.g. MyEventIsEvent -> MyEvent
-            .map(|event| event.name().rsplit_once("IsEvent::").unwrap().0.to_owned())
+            .flat_map(|(enum_path, variants)| {
+                let enum_size = variants.len();
+                variants
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, v)| v.kind == EventFieldKind::Nested)
+                    .map(move |(variant_index, v)| DeclaredEvent {
+                        enum_path: enum_path.clone(),
+                        variant_index,
+                        enum_size,
+                        variant_name: v.name,
+                        ty: v.ty,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
     }
 
     pub fn registry(&self) -> &ProgramRegistry<CoreType, CoreLibfunc> {
@@ -92,7 +162,11 @@ impl CompilationUnit {
             .iter()
             .filter(|f| matches!(f.ty(), Type::External | Type::L1Handler | Type::View))
         {
-            for param in external_function.params().skip(1) {
+            // Since cairo 2.6 the user entrypoint body is inlined into the compiler
+            // generated `__wrapper__*`. Its first non-builtin parameter is the raw
+            // `Span<felt252>` calldata (not `ContractState`), so every non-builtin
+            // parameter here is a user-controlled taint source.
+            for param in external_function.params() {
                 parameters.insert(WrapperVariable::new(external_function.name(), param.id.id));
             }
         }
@@ -113,146 +187,150 @@ impl CompilationUnit {
     }
 
     fn append_function(&mut self, data: SierraFunction, statements: Vec<SierraStatement>) {
-        // The compiler adds unsafe_new_contract_state which holds the storage variables
-        // for now we don't consider it
-        if !data.id.to_string().ends_with("::unsafe_new_contract_state") {
+        // The compiler adds unsafe_new_contract_state which holds the storage
+        // variables, and one generic unsafe_new_component_state::<...> per
+        // embedded component; for now we don't consider them. (The component
+        // constructor is matched with contains() because its monomorphized
+        // name carries a turbofish suffix.)
+        let name = data.id.to_string();
+        if !name.ends_with("::unsafe_new_contract_state")
+            && !name.contains("::unsafe_new_component_state")
+        {
             self.functions.push(Function::new(data, statements));
         }
     }
 
     fn set_functions_type(&mut self) {
-        let mut external_functions = HashSet::new();
-        let mut constructors = HashSet::new();
-
-        // Gather all the external/l1_handler functions and the constructor of each contract
-        for f in self.sierra_program.funcs.iter() {
-            let full_name = f.id.to_string();
-            if full_name.contains("::__wrapper_") {
-                // This case happens for cairo >= 2.2.0
-                let function_name = full_name.replace("__wrapper__", "").replace("__", "::");
-                if function_name.ends_with("::constructor") {
-                    constructors.insert(function_name);
-                } else {
-                    external_functions.insert(function_name);
-                }
-            } else if full_name.contains("::__external::") {
-                external_functions.insert(full_name.replace("__external::", ""));
-            } else if full_name.contains("::__constructor::") {
-                constructors.insert(full_name.replace("__constructor::", ""));
-            } else if full_name.contains("::__l1_handler::") {
-                external_functions.insert(full_name.replace("__l1_handler::", ""));
-            }
-        }
-
-        // Set the function type
+        let abi = self.abi.clone();
         for f in self.functions.iter_mut() {
             let full_name = f.name();
-            // This is needed to handle when a function is implemented inside an impl block
-            // it removes the impl name added
-            let mut full_name2: Vec<&str> = full_name.split("::").collect();
-            full_name2.remove(full_name2.len() - 2);
-            let full_name2 = full_name2.join("::");
 
-            // append_keys_and_data is a function implemented by the starknet::Event trait
+            // Corelib storage accessors. When compiling with inlining avoided
+            // (cairo >= 2.6 compiled by caracal itself) storage reads/writes
+            // appear as calls into the generic corelib storage module instead
+            // of raw syscalls or per-variable `InternalContractStateImpl`
+            // functions. Classify the read/write entry points as Storage so
+            // reads and writes keep being tracked. This must run before the
+            // generic `core::` check below.
+            if full_name.starts_with("core::starknet::storage")
+                && (full_name.ends_with("::read") || full_name.ends_with("::write"))
+            {
+                f.set_ty(Type::Storage);
+                continue;
+            }
+
+            // Core library function
             if full_name.starts_with("core::") || full_name.ends_with("::append_keys_and_data") {
                 f.set_ty(Type::Core);
-            } else if full_name.contains("::__external::")
+                continue;
+            }
+
+            // Since cairo 2.6 the user entrypoint body is inlined into the compiler
+            // generated `__wrapper__*` function. Treat the wrapper as the user
+            // entrypoint and classify it from the ABI.
+            if let Some(idx) = full_name.rfind("::__wrapper__") {
+                let inner = &full_name[idx + "::__wrapper__".len()..];
+                f.set_ty(Self::classify_entrypoint(abi.clone(), inner));
+                continue;
+            }
+
+            // Pre-2.2 cairo kept __external__/__constructor__/__l1_handler__ wrappers
+            // with the body still in a separate inner function. We keep them marked
+            // as Wrapper for backwards compatibility with older sierra.
+            if full_name.contains("::__external::")
                 || full_name.contains("::__constructor::")
                 || full_name.contains("::__l1_handler::")
-                // For cairo >= 2.2.0
-                || full_name.contains("::__wrapper_")
             {
                 f.set_ty(Type::Wrapper);
-            } else if constructors.contains(&full_name) {
-                // Constructor
-                f.set_ty(Type::Constructor);
-            } else if external_functions.contains(&full_name)
-                || external_functions.contains(&full_name2)
-            {
-                // External function, we need to check in the abi if it's view or external
-                let function_name = full_name.rsplit_once("::").unwrap().1;
+                continue;
+            }
 
-                for item in self.abi.clone() {
-                    match item {
-                        AbiFunction(function) => {
-                            if function.name == function_name {
-                                match function.state_mutability {
-                                    cairo_lang_starknet::abi::StateMutability::External => {
-                                        f.set_ty(Type::External);
-                                        break;
-                                    }
-                                    cairo_lang_starknet::abi::StateMutability::View => {
-                                        f.set_ty(Type::View);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        AbiL1Handler(l1handler) => {
-                            if l1handler.name == function_name {
-                                f.set_ty(Type::L1Handler);
-                                break;
-                            }
-                        }
-                        AbiInterface(interface) => {
-                            for item in interface.items.iter() {
-                                match item {
-                                    AbiFunction(function) => {
-                                        // If multiple interfaces have the same function name then it could be wrong
-                                        if function.name == function_name {
-                                            match function.state_mutability {
-                                                cairo_lang_starknet::abi::StateMutability::External => {
-                                                    f.set_ty(Type::External);
-                                                    break;
-                                                }
-                                                cairo_lang_starknet::abi::StateMutability::View => {
-                                                    f.set_ty(Type::View);
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    AbiL1Handler(l1handler) => {
-                                        if l1handler.name == function_name {
-                                            f.set_ty(Type::L1Handler);
-                                            break;
-                                        }
-                                    }
-                                    _ => (),
-                                }
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-            } else if full_name.ends_with("::InternalContractStateImpl::address")
+            // Contract-scoped storage plumbing generated by the #[storage]
+            // macro on cairo >= 2.6: `self.<var>` dereferences ContractState
+            // into the storage-base struct through these helpers. They are
+            // compiler plumbing, not user code — classify them as Storage so
+            // they are excluded from the user-defined function iterators.
+            if full_name.ends_with("::StorageStorageMutImpl::storage_mut")
+                || full_name.ends_with("::StorageStorageImpl::storage")
+                || full_name.ends_with("::ContractStateDerefMut::deref_mut")
+                || full_name.ends_with("::ContractStateDeref::deref")
+            {
+                f.set_ty(Type::Storage);
+                continue;
+            }
+
+            // Storage variable accessor (generated by the #[storage] macro)
+            if full_name.ends_with("::InternalContractStateImpl::address")
                 || full_name.ends_with("::InternalContractStateImpl::read")
                 || full_name.ends_with("::InternalContractStateImpl::write")
-                // Following cases for cairo >= 2.2.0
                 || full_name.ends_with("::InternalContractMemberStateImpl::address")
                 || full_name.ends_with("::InternalContractMemberStateImpl::read")
                 || full_name.ends_with("::InternalContractMemberStateImpl::write")
             {
-                // A user defined function named address/read/write can be incorrectly set to Storage
                 f.set_ty(Type::Storage);
-            // ABI trait function for library call
-            } else if full_name.contains("LibraryDispatcherImpl::") {
-                f.set_ty(Type::AbiLibraryCall)
-            // ABI trait function for call contract
-            } else if full_name.contains("DispatcherImpl::") {
-                f.set_ty(Type::AbiCallContract)
-            } else {
-                // Event or private function
-                // Could be an event emission or a private function in the contract's module
-                if full_name.contains("::emit::") {
-                    f.set_ty(Type::Event);
-                } else if full_name.ends_with(']') {
-                    f.set_ty(Type::Loop);
-                } else {
-                    f.set_ty(Type::Private);
+                continue;
+            }
+
+            // ABI dispatcher trait methods
+            if full_name.contains("LibraryDispatcherImpl::") {
+                f.set_ty(Type::AbiLibraryCall);
+                continue;
+            }
+            if full_name.contains("DispatcherImpl::") {
+                f.set_ty(Type::AbiCallContract);
+                continue;
+            }
+
+            if full_name.contains("::emit::") {
+                f.set_ty(Type::Event);
+                continue;
+            }
+            if full_name.ends_with(']') {
+                f.set_ty(Type::Loop);
+                continue;
+            }
+            f.set_ty(Type::Private);
+        }
+    }
+
+    fn classify_entrypoint(abi: Contract, inner_name: &str) -> Type {
+        if inner_name == "constructor" {
+            return Type::Constructor;
+        }
+        for item in abi {
+            match item {
+                AbiFunction(function) if function.name == inner_name => {
+                    return match function.state_mutability {
+                        cairo_lang_starknet_classes::abi::StateMutability::External => {
+                            Type::External
+                        }
+                        cairo_lang_starknet_classes::abi::StateMutability::View => Type::View,
+                    };
                 }
+                AbiL1Handler(l1h) if l1h.name == inner_name => return Type::L1Handler,
+                AbiInterface(iface) => {
+                    for item in iface.items.iter() {
+                        match item {
+                            AbiFunction(function) if function.name == inner_name => {
+                                return match function.state_mutability {
+                                    cairo_lang_starknet_classes::abi::StateMutability::External => {
+                                        Type::External
+                                    }
+                                    cairo_lang_starknet_classes::abi::StateMutability::View => {
+                                        Type::View
+                                    }
+                                };
+                            }
+                            AbiL1Handler(l1h) if l1h.name == inner_name => return Type::L1Handler,
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
             }
         }
+        // Not found in ABI: assume external (e.g. private-impl entrypoint, upgrade hook).
+        Type::External
     }
 
     /// Analyze the Sierra program and set the internal data structure
@@ -324,14 +402,18 @@ impl CompilationUnit {
         self.propagate_taints();
     }
 
-    /// Propagate the taints from external/l1_handler functions to private functions
+    /// Propagate the taints from external/view/l1_handler functions to private functions
     fn propagate_taints(&mut self) {
-        // Collect the arguments of all the external/l1_handler functions
+        // Collect the arguments of all the external/view/l1_handler functions.
+        // View functions are included because their parameters are
+        // user-controlled too (`is_tainted` already treats them as sources),
+        // and with inlining avoided the user body of a view entrypoint lives
+        // in a separate Private function that needs the propagated taint.
         let mut arguments_external_functions: FxHashSet<WrapperVariable> = FxHashSet::default();
         for function in self
             .functions
             .iter()
-            .filter(|f| matches!(f.ty(), Type::External | Type::L1Handler))
+            .filter(|f| matches!(f.ty(), Type::External | Type::View | Type::L1Handler))
         {
             for param in function.params() {
                 arguments_external_functions
@@ -345,7 +427,7 @@ impl CompilationUnit {
         }
 
         let mut changed = true;
-        // Iterate external, l1_handler, private, loop functions and propagate the taints to each private function they call
+        // Iterate external, view, l1_handler, private, loop functions and propagate the taints to each private function they call
         // until a fixpoint when no new informations were propagated
         let mut functions_to_check: HashSet<String> = self
             .functions
@@ -353,7 +435,7 @@ impl CompilationUnit {
             .filter(|f| {
                 matches!(
                     f.ty(),
-                    Type::External | Type::L1Handler | Type::Private | Type::Loop
+                    Type::External | Type::View | Type::L1Handler | Type::Private | Type::Loop
                 )
             })
             .map(|f| f.name())
@@ -369,7 +451,7 @@ impl CompilationUnit {
                 functions_to_check_copy.contains(&f.name())
                     && matches!(
                         f.ty(),
-                        Type::External | Type::L1Handler | Type::Private | Type::Loop
+                        Type::External | Type::View | Type::L1Handler | Type::Private | Type::Loop
                     )
             }) {
                 functions_to_check.remove(&calling_function.name());

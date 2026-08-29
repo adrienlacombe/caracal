@@ -4,12 +4,23 @@ use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
 use crate::core::function::Type;
+use crate::utils::{skip_bookkeeping, statement_locations, statement_summary_in_named_function};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::enm::EnumConcreteLibfunc;
 use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
 use cairo_lang_sierra::extensions::ConcreteType;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement, StatementIdx};
 
+// This detector inspects `function_call` statements, so it only sees calls
+// that survive in the sierra. Caracal compiles with inlining avoided, so
+// calls to user functions are all visible; only sierra produced with the
+// compiler's default aggressive inlining (e.g. scarb artifacts) loses the
+// inlined calls — and with them the unused computation itself, which is then
+// deleted outright and undetectable. Calls into the corelib (`core::*`,
+// classified `Type::Core`) are skipped: with inlining avoided every helper
+// the compiler used to inline (storage plumbing derefs, serde, box unbox,
+// array ops) shows up as a call, and reporting their partially-consumed
+// return values would be noise about compiler plumbing, not user intent.
 #[derive(Default)]
 pub struct UnusedReturn;
 
@@ -62,24 +73,32 @@ impl Detector for UnusedReturn {
                             if let Some(f) = compilation_unit.functions().find(|f| {
                                 f.name() == f_called.function.id.debug_name.clone().unwrap()
                             }) {
-                                // We don't check for unused return in case of Storage functions
-                                // When a loop function is called in sierra and in that function
-                                // an array is emptied with pop_front this array is dropped
-                                // when returning from the function call and it would be incorrectly
-                                // reported as unused-return
-                                if matches!(f.ty(), &Type::Storage | &Type::Loop) {
+                                // We don't check for unused return in case of Storage, Core
+                                // and Loop functions.
+                                // Storage/Core: compiler/corelib plumbing (see module comment).
+                                // Loop: when a loop function is called in sierra and in that
+                                // function an array is emptied with pop_front this array is
+                                // dropped when returning from the function call and it would
+                                // be incorrectly reported as unused-return.
+                                if matches!(f.ty(), &Type::Storage | &Type::Core | &Type::Loop) {
                                     continue;
                                 }
                             } else {
-                                // Should never happen
-                                println!(
-                                    "Unused-return: function not found {}",
-                                    f_called.function.id.debug_name.clone().unwrap()
-                                );
+                                // unsafe_new_contract_state / unsafe_new_component_state
+                                // are deliberately excluded from the function list
+                                // (see CompilationUnit::append_function), so a lookup
+                                // miss for them is expected — every entrypoint wrapper
+                                // calls one. Anything else should never happen.
+                                let callee = f_called.function.id.debug_name.clone().unwrap();
+                                if !callee.ends_with("::unsafe_new_contract_state")
+                                    && !callee.contains("::unsafe_new_component_state")
+                                {
+                                    eprintln!("Unused-return: function not found {callee}");
+                                }
                                 continue;
                             }
 
-                            let following_stmts = f.get_statements_at(i + 1);
+                            let following_stmts = skip_bookkeeping(f.get_statements_at(i + 1));
                             if let SierraStatement::Invocation(invoc) = &following_stmts[0] {
                                 let mut libfunc = compilation_unit
                                     .registry()
@@ -101,10 +120,15 @@ impl Detector for UnusedReturn {
                                             impact: self.impact(),
                                             confidence: self.confidence(),
                                             message: format!(
-                                            "Return value unused for the function call {} in {}",
-                                            stmt,
+                                            "Return value unused for the function call to {} in {}",
+                                            statement_summary_in_named_function(compilation_unit, &f.name(), stmt),
                                             f.name()
                                         ),
+                                            locations: statement_locations(
+                                                compilation_unit,
+                                                &f.name(),
+                                                stmt,
+                                            ),
                                         });
                                     }
                                 } else if let CoreConcreteLibfunc::Struct(
@@ -114,7 +138,7 @@ impl Detector for UnusedReturn {
                                     let return_variables = invoc.branches[0].results.len();
 
                                     // Go to the next statement and update the libfunc
-                                    let stmt_to_check = &following_stmts[1..];
+                                    let stmt_to_check = skip_bookkeeping(&following_stmts[1..]);
                                     if let SierraStatement::Invocation(invoc) = &stmt_to_check[0] {
                                         libfunc = compilation_unit
                                             .registry()
@@ -138,8 +162,11 @@ impl Detector for UnusedReturn {
                                 ) = libfunc
                                 {
                                     let return_variables = invoc.branches[0].results.len();
-                                    // Jump one statement which is a branch_align and the next one will be a struct_deconstruct
-                                    let stmt_to_check = &following_stmts[2..];
+                                    // Skip the branch_align (and any ap-tracking
+                                    // toggles) after the enum_match; the next
+                                    // data statement is a struct_deconstruct or
+                                    // a drop of the whole payload
+                                    let stmt_to_check = skip_bookkeeping(&following_stmts[1..]);
                                     if let SierraStatement::Invocation(invoc) = &stmt_to_check[0] {
                                         libfunc = compilation_unit
                                             .registry()
@@ -194,7 +221,7 @@ impl<'a> UnusedReturn {
 
                 return_variables_counter += 1;
 
-                stmt_to_check = &stmt_to_check[1..];
+                stmt_to_check = skip_bookkeeping(&stmt_to_check[1..]);
             } else {
                 break;
             }
@@ -214,9 +241,11 @@ impl<'a> UnusedReturn {
                     impact: self.impact(),
                     confidence: self.confidence(),
                     message: format!(
-                        "Return value unused for the function call {} in {}",
-                        stmt, function_name
+                        "Return value unused for the function call to {} in {}",
+                        statement_summary_in_named_function(compilation_unit, function_name, stmt),
+                        function_name
                     ),
+                    locations: statement_locations(compilation_unit, function_name, stmt),
                 });
             }
         }

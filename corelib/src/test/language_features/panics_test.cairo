@@ -1,5 +1,5 @@
-use core::byte_array::BYTE_ARRAY_MAGIC;
-use core::{panics, panic_with_felt252};
+use crate::byte_array::BYTE_ARRAY_MAGIC;
+use crate::{panic_with_felt252, panics};
 
 #[test]
 #[should_panic(expected: 'short_string')]
@@ -91,17 +91,15 @@ fn test_panic_with_stacked_errors() {
         1,
         0x161616161616161616161616161616161616161616161616161616161616161,
         0,
-        0
-    )
+        0,
+    ),
 )]
 fn test_panic_with_byte_array_invalid_full_word() {
     // This is a serialized ByteArray, but the full word is an invalid short string (> 2^248).
     let mut error = array![
-        BYTE_ARRAY_MAGIC,
-        1, // A single full word.
+        BYTE_ARRAY_MAGIC, 1, // A single full word.
         0x161616161616161616161616161616161616161616161616161616161616161, // The invalid full word.
-        0,
-        0 // pending byte is empty.
+        0, 0 // pending byte is empty.
     ];
     panic(error);
 }
@@ -112,15 +110,14 @@ fn test_panic_with_byte_array_invalid_full_word() {
         0x46a6158a16a947e5916b2a2ca68501a45e93d7110e81aa2d6438b1c57c879a3, // BYTE_ARRAY_MAGIC
         0,
         'aa',
-        1
-    )
+        1,
+    ),
 )]
 fn test_panic_with_byte_array_invalid_pending_word() {
     // This is a serialized ByteArray, but the pending word length < the actual data in the pending
     // word.
     let mut error = array![
-        BYTE_ARRAY_MAGIC,
-        0, // No full words.
+        BYTE_ARRAY_MAGIC, 0, // No full words.
         'aa',
         1 // pending word length. Smaller than the actual data in the pending word.
     ];
@@ -143,4 +140,29 @@ fn test_panic_macro_basic_string() {
 #[should_panic(expected: "some_format(1)")]
 fn test_panic_macro_with_input() {
     panic!("some_format({})", 1)
+}
+
+#[test]
+#[should_panic(expected: "has a \"quote\" inside")]
+fn test_panic_macro_with_escaped_quote() {
+    panic!("has a \"quote\" inside")
+}
+
+#[test]
+#[should_panic(expected: "backslash: \\end")]
+fn test_panic_macro_with_backslash() {
+    panic!("backslash: \\end")
+}
+
+
+#[test]
+#[should_panic(expected: 'PanicDestruct')]
+fn test_panic_destruct() {
+    panic_destruct_helper(1);
+}
+
+
+#[inline]
+fn panic_destruct_helper<T, +PanicDestruct<T>>(n: T) {
+    panic_with_felt252('PanicDestruct')
 }

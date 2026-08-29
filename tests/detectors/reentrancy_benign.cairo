@@ -66,4 +66,14 @@ mod TestContract {
         IAnotherContractDispatcher { contract_address: address }.foo(4);
     }
 
+    // The write happens after the first call (one finding) but BEFORE the
+    // second call: pairing the second call with the earlier write would be
+    // a false positive.
+    #[external(v0)]
+    fn bad5_write_between_calls(ref self: ContractState, address: ContractAddress) {
+        IAnotherContractDispatcher { contract_address: address }.foo(1);
+        self.a.write(4);
+        IAnotherContractDispatcher { contract_address: address }.foo(2);
+    }
+
 }

@@ -37,8 +37,13 @@ impl Printer for CallgraphPrinter {
                     self.print_callgraph(compilation_unit, f, &mut tracked_contracts, &mut graph)
                 }),
             }
-            // Add generated subgraphs to original digraph
-            for val in tracked_contracts.values() {
+            // Add generated subgraphs to the original digraph in a stable
+            // order: HashMap iteration order changes from run to run (random
+            // hasher seed), and printer output must be run-to-run
+            // deterministic like detector output.
+            let mut modules: Vec<(&String, &Subgraph)> = tracked_contracts.iter().collect();
+            modules.sort_by_key(|(name, _)| *name);
+            for (_, val) in modules {
                 graph.add_stmt(Stmt::Subgraph(val.clone()));
             }
             // Write callgraph to file
@@ -54,7 +59,7 @@ impl Printer for CallgraphPrinter {
             f.write_all(output.as_bytes()).unwrap();
             let message = format!(
                 "Call graph for module {} in file {}",
-                &module_name, &file_name
+                module_name, file_name
             );
             results.push(Result {
                 name: self.name().to_string(),
@@ -178,7 +183,7 @@ impl CallgraphPrinter {
                     &module_name
                 };
                 let formatted_module_name = format!("\"{}\"", name);
-                let cluster = format!("\"cluster_{}\"", &module_name);
+                let cluster = format!("\"cluster_{}\"", module_name);
                 let stmt = subgraph!(cluster; function_node, attr!("label",formatted_module_name));
                 tracked_fns.insert(func_name.to_string());
                 tracked_contracts.insert(module_name.clone(), stmt);
@@ -200,13 +205,13 @@ impl CallgraphPrinter {
             // Leave module name w/o quotes, we'll modify it when computing the subgraph name
             (
                 (&module_name).to_string(),
-                format!("\"{}\"", &exact_func_name),
+                format!("\"{}\"", exact_func_name),
             )
         } else {
             let (module_name, exact_func_name) = func_name.rsplit_once("::").unwrap();
             (
                 (&module_name).to_string(),
-                format!("\"{}\"", &exact_func_name),
+                format!("\"{}\"", exact_func_name),
             )
         }
     }

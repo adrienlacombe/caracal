@@ -78,6 +78,9 @@ impl Detector for DeadCode {
                             "Function {} defined in {} is never used",
                             function_name, function_declaration
                         ),
+                        // The unused function was dropped from the sierra
+                        // program, so there is nothing to map to a location.
+                        locations: Vec::new(),
                     });
                 });
         }

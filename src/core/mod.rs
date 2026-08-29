@@ -4,3 +4,4 @@ pub mod compilation_unit;
 pub mod core_unit;
 pub mod function;
 pub mod instruction;
+pub mod source_map;

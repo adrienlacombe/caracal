@@ -18,37 +18,64 @@ env:
 
 jobs:
   lint:
-    # Name the Job
-    name: Lint Code Base
-    # Set the agent to run on
+    # Native rustfmt + clippy: super-linter's bundled Rust toolchain is far
+    # older than this repo's floor (rustc >= 1.94, Cargo.lock v4) and cannot
+    # even read the lock file. RUSTFLAGS=-Dwarnings from the workflow env
+    # makes clippy fail on any warning.
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          # Full git history is needed to get a proper
-          # list of changed files within `super-linter`
-          fetch-depth: 0
-
-      - name: Lint Code Base
-        uses: super-linter/super-linter@v5
-        env:
-          VALIDATE_ALL_CODEBASE: true
-          VALIDATE_RUST_2021: true
-          VALIDATE_RUST_CLIPPY: true
-          DEFAULT_BRANCH: master
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v3
+      - run: rustup update stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets
 
   test:
     name: Rust tests
     strategy:
+      # Let each OS finish: one platform failing must not cancel the others'
+      # signal.
+      fail-fast: false
       matrix:
         environment: [ubuntu-latest, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.environment }}
-    
+
     steps:
       - uses: actions/checkout@v3
       - run: rustup update
       - run: cargo test
+
+  corpus:
+    name: Corpus regression
+    runs-on: ubuntu-latest
+    env:
+      # This job builds OZ's Rust proc-macro package through scarb's cargo;
+      # -Dwarnings is not ours to enforce there (clippy covers this repo).
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+      # scripts/corpus.sh installs the pinned scarb itself (version pinned in
+      # the script, next to the pinned corpus tags), clones both corpus
+      # targets — openzeppelin/cairo-contracts (artifact-fallback Scarb path)
+      # and EkuboProtocol/governance (in-process Scarb path) — runs caracal
+      # over them, asserts each took its expected compilation path and fails
+      # on any drift from tests/corpus/expected_summary_*.txt.
+      - name: Run corpus regression check
+        run: ./scripts/corpus.sh
+      # The in-process Scarb compilation test needs scarb on PATH, which the
+      # cross-platform test job doesn't have; reuse the scarb corpus.sh just
+      # provisioned into its cache. --release reuses the corpus run's build.
+      - name: Scarb in-process compilation test
+        run: |
+          if ! command -v scarb >/dev/null 2>&1; then
+            SCARB_BIN="$(find "$HOME/.cache/caracal-corpus" -type f -name scarb -path '*/bin/*' | head -n 1)"
+            [ -n "$SCARB_BIN" ] || { echo "no scarb found in the corpus cache" >&2; exit 1; }
+            export PATH="$(dirname "$SCARB_BIN"):$PATH"
+          fi
+          scarb --version
+          CARACAL_TEST_SCARB=1 cargo test --release --test scarb_inprocess

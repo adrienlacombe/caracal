@@ -1,0 +1,8 @@
+# Check every text file out with LF line endings on all platforms (GitHub's
+# Windows runners set core.autocrlf=true, which would otherwise give CRLF
+# working trees). The insta snapshots depend on byte-identical .cairo
+# fixtures: the Cairo compiler names generated inner functions (loops,
+# closures) with byte-offset spans — e.g. `bad_loop[136-339]` — and CRLF
+# line endings shift every offset, changing the SIERRA function names that
+# detector messages embed.
+* text=auto eol=lf

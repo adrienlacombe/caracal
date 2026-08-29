@@ -3,9 +3,11 @@ use std::collections::HashSet;
 use super::detector::{Confidence, Detector, Impact, Result};
 use crate::core::compilation_unit::CompilationUnit;
 use crate::core::core_unit::CoreUnit;
-use crate::utils::filter_builtins_from_arguments;
+use crate::utils::{
+    filter_builtins_from_arguments, statement_locations, statement_summary_in_named_function,
+};
 use cairo_lang_sierra::extensions::{
-    core::CoreConcreteLibfunc, lib_func::ParamSignature, starknet::StarkNetConcreteLibfunc,
+    core::CoreConcreteLibfunc, lib_func::ParamSignature, starknet::StarknetConcreteLibfunc,
 };
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement, StatementIdx};
@@ -69,8 +71,8 @@ impl Detector for ControlledLibraryCall {
                             .expect("Library function not found in the registry");
 
                         // We care only about a library call
-                        if let CoreConcreteLibfunc::StarkNet(
-                            StarkNetConcreteLibfunc::LibraryCall(l),
+                        if let CoreConcreteLibfunc::Starknet(
+                            StarknetConcreteLibfunc::LibraryCall(l),
                         ) = libfunc
                         {
                             self.check_user_controlled(
@@ -108,13 +110,15 @@ impl ControlledLibraryCall {
         if compilation_unit.is_tainted(function_name.to_string(), class_hash) {
             let message = format!(
                 "Library call to user controlled class hash in {}\n {}",
-                function_name, statement
+                function_name,
+                statement_summary_in_named_function(compilation_unit, function_name, statement)
             );
             results.insert(Result {
                 name: self.name().to_string(),
                 impact: self.impact(),
                 confidence: self.confidence(),
                 message,
+                locations: statement_locations(compilation_unit, function_name, statement),
             });
         }
     }
