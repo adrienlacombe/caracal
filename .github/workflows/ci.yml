@@ -18,31 +18,26 @@ env:
 
 jobs:
   lint:
-    # Name the Job
-    name: Lint Code Base
-    # Set the agent to run on
+    # Native rustfmt + clippy: super-linter's bundled Rust toolchain is far
+    # older than this repo's floor (rustc >= 1.94, Cargo.lock v4) and cannot
+    # even read the lock file. RUSTFLAGS=-Dwarnings from the workflow env
+    # makes clippy fail on any warning.
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          # Full git history is needed to get a proper
-          # list of changed files within `super-linter`
-          fetch-depth: 0
-
-      - name: Lint Code Base
-        uses: super-linter/super-linter@v5
-        env:
-          VALIDATE_ALL_CODEBASE: true
-          VALIDATE_RUST_2021: true
-          VALIDATE_RUST_CLIPPY: true
-          DEFAULT_BRANCH: master
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v3
+      - run: rustup update stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets
 
   test:
     name: Rust tests
     strategy:
+      # Let each OS finish: one platform failing must not cancel the others'
+      # signal.
+      fail-fast: false
       matrix:
         environment: [ubuntu-latest, macos-latest, windows-latest]
 
