@@ -12,7 +12,7 @@ use cairo_lang_starknet_classes::abi::{
     Contract, EventFieldKind, EventKind, Item::Event as AbiEvent, Item::Function as AbiFunction,
     Item::Interface as AbiInterface, Item::L1Handler as AbiL1Handler,
 };
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 use std::collections::{HashMap, HashSet};
 
 /// One variant of an ABI event enum, i.e. one emittable event.

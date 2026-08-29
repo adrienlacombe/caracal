@@ -7,7 +7,7 @@ use crate::utils::{call_tree_any, function_locations, function_summary, is_calle
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::program::Statement as SierraStatement;
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 
 /// An External entrypoint that is caller-gated (an access-controlled,
 /// privileged operation) and writes storage should emit an event: privileged

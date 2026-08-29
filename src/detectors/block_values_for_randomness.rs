@@ -13,7 +13,7 @@ use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::structure::StructConcreteLibfunc;
 use cairo_lang_sierra::extensions::ConcreteLibfunc;
 use cairo_lang_sierra::program::{GenInvocation, Statement as SierraStatement, StatementIdx};
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 
 /// The block timestamp and block number are chosen by the sequencer (and
 /// knowable by anyone before inclusion), so deriving "randomness" from them —

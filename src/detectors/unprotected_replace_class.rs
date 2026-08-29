@@ -6,7 +6,7 @@ use crate::utils::{function_locations, function_summary, is_caller_checked};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
 /// `replace_class_syscall` overwrites the contract's own class. If it is

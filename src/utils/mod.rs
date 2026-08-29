@@ -10,9 +10,9 @@ use cairo_lang_sierra::extensions::lib_func::{OutputVarInfo, ParamSignature};
 use cairo_lang_sierra::extensions::starknet::StarknetConcreteLibfunc;
 use cairo_lang_sierra::ids::VarId;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
-use fxhash::FxHashSet;
 use num_bigint::BigInt;
 use num_traits::Num;
+use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
 pub const BUILTINS: [&str; 8] = [

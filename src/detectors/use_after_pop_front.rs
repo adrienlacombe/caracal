@@ -9,7 +9,7 @@ use crate::utils::{function_locations, function_summary};
 use cairo_lang_sierra::extensions::array::ArrayConcreteLibfunc;
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreTypeConcrete};
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 
 #[derive(Default)]
 pub struct UseAfterPopFront {}

@@ -9,7 +9,7 @@ use crate::utils::{function_locations, function_summary, number_to_ordinal};
 use cairo_lang_sierra::extensions::core::CoreConcreteLibfunc;
 use cairo_lang_sierra::extensions::felt252::Felt252Concrete;
 use cairo_lang_sierra::program::{GenStatement, Statement as SierraStatement};
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 
 /// A constructor that takes a `ContractAddress` (an owner, an admin, a
 /// token, ...) and stores it without rejecting the zero address bricks the

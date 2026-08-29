@@ -14,12 +14,15 @@ serde_json = "1.0"
 num-bigint = "0.4"
 num-traits = "0.2"
 termcolor = "1.2"
-graphviz-rust = "0.7.0"
+graphviz-rust = "0.9"
 rayon = "1.8"
-fxhash = "0.2.1"
+# Already in the dependency tree via the cairo-lang-* crates.
+rustc-hash = "2"
 # Both already in the dependency tree via the cairo-lang-* crates; declaring
 # them adds no new transitive code.
 toml = "1"
+# sha2 0.11 is out but the cairo-lang-* tree is still on 0.10: bumping would
+# add a duplicate sha2 build for no benefit. Revisit with a compiler bump.
 sha2 = "0.10"
 # Also already in the tree (CrateSettings::version is a semver::Version).
 semver = "1"

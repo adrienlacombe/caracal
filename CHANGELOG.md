@@ -28,6 +28,17 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 - Five direct dependencies freed by the de-vendoring — `once_cell`,
   `smol_str`, `thiserror`, `cairo-felt`, `num-integer` — the vendored files
   were their only users.
+- `fxhash` (unmaintained), replaced by `rustc-hash` (same
+  `FxHashMap`/`FxHashSet` API, already in the tree via the cairo crates).
+
+### Changed
+- `graphviz-rust` 0.7 -> 0.9 (API-compatible with caracal's usage).
+- Refreshed `Cargo.lock` to the latest semver-compatible versions of all
+  non-`cairo-lang-*` dependencies. Net effect of the audit: 333 -> 322 locked
+  packages. Deferred majors: `num-bigint` 0.5 (the cairo crates' APIs
+  caracal calls exchange 0.4 `BigInt`/`BigUint` values) and `sha2` 0.11
+  (the cairo tree is still on 0.10; bumping would add a duplicate sha2
+  build for no benefit).
 
 ## [0.3.0] - 2026-08-28
 
