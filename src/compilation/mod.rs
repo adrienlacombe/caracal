@@ -11,7 +11,6 @@ mod cairo_project;
 mod corelib;
 mod scarb;
 mod standard;
-pub mod utils;
 
 pub struct ProgramCompiled {
     pub sierra: Program,

@@ -4,8 +4,6 @@ use std::process;
 use std::process::Output;
 
 use super::ProgramCompiled;
-use crate::compilation::utils::felt252_serde::sierra_from_felt252s;
-use crate::compilation::utils::replacer::SierraProgramDebugReplacer;
 use crate::core::core_unit::CoreOpts;
 use crate::core::source_map::{SourceBase, SourceMap};
 use cairo_lang_compiler::db::RootDatabase;
@@ -16,7 +14,6 @@ use cairo_lang_filesystem::db::init_dev_corelib;
 use cairo_lang_filesystem::ids::CrateInput;
 use cairo_lang_lowering::optimizations::config::Optimizations;
 use cairo_lang_lowering::utils::InliningStrategy;
-use cairo_lang_sierra_generator::replace_ids::SierraIdReplacer;
 use cairo_lang_starknet::compile::compile_prepared_db;
 use cairo_lang_starknet::contract::find_contracts;
 use cairo_lang_starknet::starknet_plugin_suite;
@@ -125,13 +122,15 @@ fn bundled_compiler(opts: CoreOpts, corelib: PathBuf) -> Result<Vec<ProgramCompi
         .unwrap_or_default();
 
     for contract_class in contract_classes {
-        let debug_info = contract_class.sierra_program_debug_info.unwrap();
+        let debug_info = contract_class
+            .sierra_program_debug_info
+            .as_ref()
+            .expect("replace_ids was set");
         let source_map =
-            (!source_bases.is_empty()).then(|| SourceMap::new(&debug_info, &source_bases));
-        let program = sierra_from_felt252s(&contract_class.sierra_program)
-            .unwrap()
-            .2;
-        let program = SierraProgramDebugReplacer { debug_info }.apply(&program);
+            (!source_bases.is_empty()).then(|| SourceMap::new(debug_info, &source_bases));
+        // `true` populates the program's ids with the debug names carried in
+        // `sierra_program_debug_info` (checked present above).
+        let program = contract_class.extract_sierra_program(true).unwrap().program;
 
         programs_compiled.push(ProgramCompiled {
             sierra: program,
@@ -186,13 +185,14 @@ fn local_compiler(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         let contract_class: ContractClass =
             serde_json::from_str(&String::from_utf8(compiler_call.stdout)?).unwrap();
 
-        // We don't have to check the existence because we ran the compiler with --replace-ids
-        let debug_info = contract_class.sierra_program_debug_info.unwrap();
-
-        let sierra = sierra_from_felt252s(&contract_class.sierra_program)
-            .unwrap()
-            .2;
-        let sierra = SierraProgramDebugReplacer { debug_info }.apply(&sierra);
+        // Debug info must exist because we ran the compiler with --replace-ids;
+        // `extract_sierra_program(true)` would silently skip name population
+        // without it, so keep the explicit check.
+        assert!(
+            contract_class.sierra_program_debug_info.is_some(),
+            "starknet-compile --replace-ids produced no debug info"
+        );
+        let sierra = contract_class.extract_sierra_program(true).unwrap().program;
 
         programs_compiled.push(ProgramCompiled {
             sierra,

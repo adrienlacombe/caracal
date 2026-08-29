@@ -27,8 +27,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-use crate::compilation::utils::felt252_serde::sierra_from_felt252s;
-use crate::compilation::utils::replacer::SierraProgramDebugReplacer;
 use crate::compilation::ProgramCompiled;
 use crate::core::core_unit::CoreOpts;
 use crate::core::source_map::{SourceBase, SourceMap};
@@ -44,7 +42,6 @@ use cairo_lang_filesystem::ids::{CrateLongId, SmolStrId};
 use cairo_lang_lowering::optimizations::config::Optimizations;
 use cairo_lang_lowering::utils::InliningStrategy;
 use cairo_lang_project::{AllCratesConfig, ProjectConfig, ProjectConfigContent};
-use cairo_lang_sierra_generator::replace_ids::SierraIdReplacer;
 use cairo_lang_starknet::compile::compile_prepared_db;
 use cairo_lang_starknet::contract::find_contracts;
 use cairo_lang_starknet::starknet_plugin_suite;
@@ -463,12 +460,12 @@ fn compile_unit(
     for contract_class in contract_classes {
         let debug_info = contract_class
             .sierra_program_debug_info
+            .as_ref()
             .expect("replace_ids was set");
-        let source_map = SourceMap::new(&debug_info, &source_bases);
-        let program = sierra_from_felt252s(&contract_class.sierra_program)
-            .unwrap()
-            .2;
-        let program = SierraProgramDebugReplacer { debug_info }.apply(&program);
+        let source_map = SourceMap::new(debug_info, &source_bases);
+        // `true` populates the program's ids with the debug names carried in
+        // `sierra_program_debug_info` (checked present above).
+        let program = contract_class.extract_sierra_program(true).unwrap().program;
         programs_compiled.push(ProgramCompiled {
             sierra: program,
             abi: contract_class.abi.unwrap(),
@@ -622,7 +619,9 @@ fn compile_from_artifacts(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
         } else {
             continue;
         };
-        let Some(debug_info) = contract_class.sierra_program_debug_info else {
+        // `extract_sierra_program(true)` silently skips name population when
+        // debug info is absent — the skip-this-file semantics must stay here.
+        let Some(debug_info) = contract_class.sierra_program_debug_info.as_ref() else {
             eprintln!("Skipping analysing file {}. Debug info not found. Ensure in Scarb.toml you have \n[cairo]\nsierra-replace-ids = true\n", sierra_file.to_str().unwrap());
             continue;
         };
@@ -634,10 +633,7 @@ fn compile_from_artifacts(opts: CoreOpts) -> Result<Vec<ProgramCompiled>> {
             continue;
         }
 
-        let program = sierra_from_felt252s(&contract_class.sierra_program)
-            .unwrap()
-            .2;
-        let program = SierraProgramDebugReplacer { debug_info }.apply(&program);
+        let program = contract_class.extract_sierra_program(true).unwrap().program;
         programs_compiled.push(ProgramCompiled {
             sierra: program,
             abi: contract_class.abi.unwrap(),
