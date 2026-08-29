@@ -3,44 +3,9 @@
 All notable changes to this project are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.3.0] - 2026-08-29
 
-### Removed
-- The direct `starknet-types-core = "=0.1.7"` dependency. It was an ARM-build
-  workaround from the cairo-2.5 era and had become dead weight: caracal no
-  longer uses the crate directly, and the pinned cairo v2.20.0 workspace
-  itself depends on `starknet-types-core = "0.2.4"` (which builds fine on
-  ARM — the v0.3.0 aarch64 release binaries prove it), so the pin only
-  forced a duplicate 0.1.7 copy into the build.
-- The vendored copies of old upstream cairo internals in
-  `src/compilation/utils/` (`felt252_serde.rs`, `felt252_vec_compression.rs`,
-  `replacer.rs`). The pinned `cairo-lang-starknet-classes` now exposes the
-  same functionality publicly as
-  `ContractClass::extract_sierra_program(populate_debug_info: true)`, whose
-  `DebugInfo::populate` walks exactly the program items the vendored
-  `SierraProgramDebugReplacer` did (it only differs by tolerating missing
-  debug names instead of panicking). Verified equivalent end-to-end: zero
-  snapshot changes and unchanged corpus summaries on both targets, including
-  the Scarb artifact-fallback path (`oz`). The skip-file-without-debug-info
-  guard in the fallback path stays caller-side because
-  `extract_sierra_program(true)` silently skips population when debug info
-  is absent.
-- Five direct dependencies freed by the de-vendoring — `once_cell`,
-  `smol_str`, `thiserror`, `cairo-felt`, `num-integer` — the vendored files
-  were their only users.
-- `fxhash` (unmaintained), replaced by `rustc-hash` (same
-  `FxHashMap`/`FxHashSet` API, already in the tree via the cairo crates).
-
-### Changed
-- `graphviz-rust` 0.7 -> 0.9 (API-compatible with caracal's usage).
-- Refreshed `Cargo.lock` to the latest semver-compatible versions of all
-  non-`cairo-lang-*` dependencies. Net effect of the audit: 333 -> 322 locked
-  packages. Deferred majors: `num-bigint` 0.5 (the cairo crates' APIs
-  caracal calls exchange 0.4 `BigInt`/`BigUint` values) and `sha2` 0.11
-  (the cairo tree is still on 0.10; bumping would add a duplicate sha2
-  build for no benefit).
-
-## [0.3.0] - 2026-08-28
+### Release summary
 
 First release of this fork ([adrienlacombe/caracal](https://github.com/adrienlacombe/caracal)),
 covering everything since upstream crytic/caracal 0.2.3.
@@ -210,6 +175,41 @@ Inert and documented (kept wired up rather than deleted):
   target installation, single draft release assembled from all build
   artifacts, and two new prebuilt targets — `aarch64-apple-darwin` and
   `aarch64-unknown-linux-gnu` (native ARM runners, no cross-compilation).
+
+### Removed
+- The direct `starknet-types-core = "=0.1.7"` dependency. It was an ARM-build
+  workaround from the cairo-2.5 era and had become dead weight: caracal no
+  longer uses the crate directly, and the pinned cairo v2.20.0 workspace
+  itself depends on `starknet-types-core = "0.2.4"` (which builds fine on
+  ARM — the v0.3.0 aarch64 release binaries prove it), so the pin only
+  forced a duplicate 0.1.7 copy into the build.
+- The vendored copies of old upstream cairo internals in
+  `src/compilation/utils/` (`felt252_serde.rs`, `felt252_vec_compression.rs`,
+  `replacer.rs`). The pinned `cairo-lang-starknet-classes` now exposes the
+  same functionality publicly as
+  `ContractClass::extract_sierra_program(populate_debug_info: true)`, whose
+  `DebugInfo::populate` walks exactly the program items the vendored
+  `SierraProgramDebugReplacer` did (it only differs by tolerating missing
+  debug names instead of panicking). Verified equivalent end-to-end: zero
+  snapshot changes and unchanged corpus summaries on both targets, including
+  the Scarb artifact-fallback path (`oz`). The skip-file-without-debug-info
+  guard in the fallback path stays caller-side because
+  `extract_sierra_program(true)` silently skips population when debug info
+  is absent.
+- Five direct dependencies freed by the de-vendoring — `once_cell`,
+  `smol_str`, `thiserror`, `cairo-felt`, `num-integer` — the vendored files
+  were their only users.
+- `fxhash` (unmaintained), replaced by `rustc-hash` (same
+  `FxHashMap`/`FxHashSet` API, already in the tree via the cairo crates).
+
+### Changed
+- `graphviz-rust` 0.7 -> 0.9 (API-compatible with caracal's usage).
+- Refreshed `Cargo.lock` to the latest semver-compatible versions of all
+  non-`cairo-lang-*` dependencies. Net effect of the audit: 333 -> 322 locked
+  packages. Deferred majors: `num-bigint` 0.5 (the cairo crates' APIs
+  caracal calls exchange 0.4 `BigInt`/`BigUint` values) and `sha2` 0.11
+  (the cairo tree is still on 0.10; bumping would add a duplicate sha2
+  build for no benefit).
 
 ### Upgrade notes
 
