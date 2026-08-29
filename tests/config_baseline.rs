@@ -162,12 +162,17 @@ fn baseline_workflow_end_to_end() {
 
     // Insert a new vulnerable function at the TOP of the contract: existing
     // findings shift lines (and must stay suppressed), the new one surfaces.
+    // The anchor deliberately has no trailing newline: Windows CI checks the
+    // fixture out with CRLF line endings (git autocrlf), so an anchor ending
+    // in "\n" would silently not match "\r\n" and the patch would no-op.
     let source = std::fs::read_to_string(fixture).unwrap();
-    let source = source.replace(
-        "    struct Storage {}\n",
-        "    struct Storage {}\n\n    #[external(v0)]\n    fn bad_new(ref self: ContractState, class_hash: ClassHash) -> u128 {\n       IAnotherContractLibraryDispatcher { class_hash: class_hash }.foo(2_u128)\n    }\n",
+    let patched = source.replacen(
+        "    struct Storage {}",
+        "    struct Storage {}\n\n    #[external(v0)]\n    fn bad_new(ref self: ContractState, class_hash: ClassHash) -> u128 {\n       IAnotherContractLibraryDispatcher { class_hash: class_hash }.foo(2_u128)\n    }",
+        1,
     );
-    std::fs::write(fixture, source).unwrap();
+    assert_ne!(patched, source, "patch anchor not found in the fixture");
+    std::fs::write(fixture, patched).unwrap();
 
     let out = run_caracal(
         &dir,
